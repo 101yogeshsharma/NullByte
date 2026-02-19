@@ -27,20 +27,28 @@ jobs:
         run: npm ci
 
       - name: Build Electron app
-        run: npm run build
+        run: npx electron-builder --win nsis --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List dist contents
-        run: Get-ChildItem -Path dist -Recurse | Select-Object FullName, Length
+        run: Get-ChildItem -Path dist -Recurse -File | Select-Object FullName, Length
         shell: pwsh
 
-      - name: Upload build artifacts
+      - name: Keep only .exe installer
+        run: |
+          Get-ChildItem -Path dist -File | Where-Object { $_.Extension -ne '.exe' } | Remove-Item -Force
+          Get-ChildItem -Path dist -Directory | Remove-Item -Recurse -Force
+          Write-Host "Files remaining in dist:"
+          Get-ChildItem -Path dist -File | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)" }
+        shell: pwsh
+
+      - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: NullByte-Windows
-          path: |
-            dist/*.exe
+          path: dist/*.exe
+          if-no-files-found: error
           retention-days: 5
 
   release:
@@ -73,9 +81,6 @@ jobs:
 
             ### 🛠️ Build from Source
             If you prefer to build from source, see the [README](https://github.com/101yogeshsharma/NullByte#-getting-started) for instructions.
-
-            ---
-            _Full changelog: https://github.com/101yogeshsharma/NullByte/compare/...$ {{ github.ref_name }}_
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           files: dist/*.exe
