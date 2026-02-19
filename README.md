@@ -47,6 +47,8 @@ NullByte uses Google's Gemini AI under the hood. You'll need a free API key:
 3. Click **"Get API Key"** → **"Create API Key"**.
 4. Copy the key — you'll paste it into NullByte when you first launch it.
 
+> **Note:** Your API key may have restrictions. If the default `gemini-1.5-flash` model fails, try selecting another model from the app's dropdown menu.
+
 ### 4. Run in Development Mode
 
 ```bash
@@ -67,7 +69,7 @@ To create a standalone installer that you can share or install on any Windows ma
 npm run build
 ```
 
-The output installer (`NullByte.exe`) will be in the `dist/` folder.
+The output installer (`NullByte.v0.1.0-alpha.exe`) will be in the `dist/` folder.
 
 > **💡 Tip for Git Bash / WSL users:** You can also use the included build script:
 > ```bash
