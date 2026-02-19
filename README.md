@@ -1,5 +1,10 @@
 # NullByte — AI Coding Assistant
 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/101yogeshsharma/NullByte?color=6c5ce7&style=for-the-badge)
+![GitHub stars](https://img.shields.io/github/stars/101yogeshsharma/NullByte?style=for-the-badge)
+![GitHub all releases](https://img.shields.io/github/downloads/101yogeshsharma/NullByte/total?style=for-the-badge&color=55efc4)
+![License](https://img.shields.io/github/license/101yogeshsharma/NullByte?style=for-the-badge)
+
 NullByte is a lightweight Electron-based desktop tool that gives you instant access to Google's Gemini AI while you code. It sits on top of your IDE, browser, or terminal as a non-intrusive floating panel — perfect for quick code explanations, debugging help, and on-the-fly learning.
 
 > **⚠️ Disclaimer:** NullByte is designed as a **personal productivity and learning tool**. It is **not** intended for use during interviews, exams, proctored assessments, or any scenario where external assistance is prohibited. Please use this tool ethically and responsibly.
