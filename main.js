@@ -304,7 +304,12 @@ async function solveWithGemini() {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: geminiModel });
 
-    const prompt = `You are an expert competitive programmer. This is a screenshot from a coding interview platform. Solve the problem completely. Return clean, well-commented code in the detected language. Also give time/space complexity and a short explanation.`;
+    const prompt = `Analyze the attached image(s). Provide the direct, correct answer or solution to the question, problem, or task shown.
+    - If it is a coding problem, output ONLY the fully functional code.
+    - If it is a multiple-choice question, output ONLY the correct option(s).
+    - If it is a language/communication question, output ONLY the required response or correction.
+    - If it is an aptitude/IQ test, output ONLY the logical answer or next item in sequence.
+    - Do NOT include any explanations, reasoning, or conversational filler.`;
 
     const imageParts = screenshots.map(path => {
       const fileData = fs.readFileSync(path);
@@ -527,8 +532,12 @@ ipcMain.on('set-ignore-mouse', (event, ignore) => {
 });
 
 ipcMain.on('resize-window', (event, { width, height }) => {
-  if (mainWindow) {
-    mainWindow.setSize(width, height);
+  if (mainWindow && Number.isFinite(width) && Number.isFinite(height)) {
+    try {
+        mainWindow.setSize(Math.round(width), Math.round(height));
+    } catch (e) {
+        console.error("Resize error:", e);
+    }
   }
 });
 

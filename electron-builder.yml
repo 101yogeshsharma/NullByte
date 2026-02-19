@@ -9,9 +9,9 @@ win:
   requestedExecutionLevel: asInvoker
   artifactName: NullByte.v${version}.${ext}
 nsis:
-  oneClick: true
+  oneClick: false
   perMachine: false
-  allowToChangeInstallationDirectory: false
+  allowToChangeInstallationDirectory: true
   shortcutName: NullByte
   include: build/installer.nsh
   createDesktopShortcut: true

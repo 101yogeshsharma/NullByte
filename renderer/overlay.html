@@ -462,7 +462,10 @@
             app.style.height = targetHeight + 'px';
 
             requestAnimationFrame(() => {
-                window.api.resizeWindow({ width: WIDTH, height: targetHeight });
+                const h = Math.floor(targetHeight);
+                if (Number.isFinite(h) && h > 0) {
+                    window.api.resizeWindow({ width: WIDTH, height: h });
+                }
             });
         }
 
