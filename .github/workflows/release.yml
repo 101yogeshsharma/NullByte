@@ -1,0 +1,84 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v0.1.0, v1.0.0, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List dist contents
+        run: Get-ChildItem -Path dist -Recurse | Select-Object FullName, Length
+        shell: pwsh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullByte-Windows
+          path: |
+            dist/*.exe
+          retention-days: 5
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: NullByte-Windows
+          path: dist
+
+      - name: List downloaded artifacts
+        run: ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NullByte ${{ github.ref_name }}
+          body: |
+            ## NullByte ${{ github.ref_name }}
+
+            ### 📥 Download
+            Download the **NullByte.exe** installer below and run it to install NullByte on your Windows machine.
+
+            ### 🔑 Setup
+            You'll need a free Gemini API key from [Google AI Studio](https://aistudio.google.com/) to use NullByte.
+
+            ### 🛠️ Build from Source
+            If you prefer to build from source, see the [README](https://github.com/101yogeshsharma/NullByte#-getting-started) for instructions.
+
+            ---
+            _Full changelog: https://github.com/101yogeshsharma/NullByte/compare/...$ {{ github.ref_name }}_
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: dist/*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,20 @@
+appId: com.nullbyte.app
+productName: NullByte
+directories:
+  output: dist
+  app: .
+win:
+  target: nsis
+  icon: assets/icon.png
+  requestedExecutionLevel: asInvoker
+  artifactName: NullByte.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  shortcutName: NullByte
+  include: build/installer.nsh
+  createDesktopShortcut: false
+  createStartMenuShortcut: false
+  installerIcon: assets/icon.png
+  uninstallerIcon: assets/icon.png

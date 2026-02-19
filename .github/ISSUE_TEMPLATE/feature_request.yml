@@ -1,0 +1,65 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement for NullByte
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make NullByte better? We'd love to hear it! Please describe your suggestion in detail below.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Describe it.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or feature you'd like to see.
+      placeholder: Describe your ideal solution...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe any alternatives you've considered...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What area does this feature relate to?
+      options:
+        - UI / UX
+        - AI / Model Integration
+        - Keyboard Shortcuts
+        - Screenshot System
+        - Build / Installation
+        - Performance
+        - Platform Support (macOS, Linux)
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any mockups, examples, or other context to help us understand the request.
+      placeholder: Add any other context, mockups, or screenshots here...
+    validations:
+      required: false

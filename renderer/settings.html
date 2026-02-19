@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Settings</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #222;
+            color: #eee;
+            padding: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #646cff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #535bf2;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Settings</h2>
+
+    <label>Gemini Model</label>
+    <select id="model">
+        <option value="" disabled selected>Loading models...</option>
+        <option value="custom">Custom Model ID...</option>
+    </select>
+    <input type="text" id="customModelInput" placeholder="e.g. gemini-3.0-pro-exp"
+        style="display: none; margin-top: -10px;">
+
+    <label>Update API Key</label>
+    <input type="password" id="apiKey" placeholder="Leave empty to keep current" />
+
+    <button id="save">Save Settings</button>
+
+    <script>
+        const modelSelect = document.getElementById('model');
+        const customModelInput = document.getElementById('customModelInput');
+        const apiKeyInput = document.getElementById('apiKey');
+
+        const logDiv = document.getElementById('connection-log');
+        const testBtn = document.getElementById('test-key');
+
+        function log(msg, isError = false) {
+            logDiv.style.display = 'block';
+            logDiv.style.color = isError ? '#ff6b6b' : '#aaa';
+            logDiv.textContent = msg;
+        }
+
+        testBtn.addEventListener('click', async () => {
+            log("Testing connection to Google AI...");
+            try {
+                // Forcing a refresh of models
+                const models = await window.api.getModels();
+                if (models && models.length > 0) {
+                    log(`Success! Your key is valid.\nAvailable Models:\n` + models.map(m => `• ${m.id}`).join('\n'), false);
+
+                    // Auto-populate dropdown if list was empty before
+                    if (modelSelect.options[0].disabled) {
+                        modelSelect.innerHTML = '';
+                        models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.id;
+                            opt.textContent = `${m.displayName} (${m.id})`;
+                            modelSelect.appendChild(opt);
+                        });
+                        const customOpt = document.createElement('option');
+                        customOpt.value = 'custom';
+                        customOpt.textContent = 'Custom Model ID...';
+                        modelSelect.appendChild(customOpt);
+                        modelSelect.value = models[0].id;
+                    }
+                } else {
+                    log("Error: Key seems valid logic-wise, but Google returned NO models. Check strict API key permissions or region.", true);
+                }
+            } catch (e) {
+                log("Connection Error: " + e.message, true);
+            }
+        });
+
+        // Toggle custom input
+        modelSelect.addEventListener('change', () => {
+            if (modelSelect.value === 'custom') {
+                customModelInput.style.display = 'block';
+            } else {
+                customModelInput.style.display = 'none';
+            }
+        });
+
+        // Load settings
+        window.api.getSettings().then(async (settings) => {
+            // Fetch online models
+            const onlineModels = await window.api.getModels();
+            const modelList = onlineModels.length > 0 ? onlineModels : [
+                { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B (User Request)' },
+                { id: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash Exp' },
+                { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
+                { id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash' }
+            ];
+
+            // Rebuild Select
+            modelSelect.innerHTML = ''; // Clear "Loading..."
+
+            // Prioritize specific models if needed, or just list them
+            modelList.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.displayName} (${m.id})`;
+                modelSelect.appendChild(opt);
+            });
+
+            // Add Custom option at end
+            const customOpt = document.createElement('option');
+            customOpt.value = 'custom';
+            customOpt.textContent = 'Custom Model ID...';
+            modelSelect.appendChild(customOpt);
+
+            // Set Value
+            if (settings.model) {
+                const found = modelList.find(m => m.id === settings.model);
+                if (found) {
+                    modelSelect.value = settings.model;
+                } else {
+                    modelSelect.value = 'custom';
+                    customModelInput.style.display = 'block';
+                    customModelInput.value = settings.model;
+                }
+            } else {
+                // Default to first if not set
+                if (modelList.length > 0) modelSelect.value = modelList[0].id;
+            }
+        });
+
+        document.getElementById('save').addEventListener('click', async () => {
+            let selectedModel = modelSelect.value;
+            if (selectedModel === 'custom') {
+                selectedModel = customModelInput.value.trim();
+                if (!selectedModel) {
+                    alert('Please enter a custom model ID');
+                    return;
+                }
+            }
+
+            const updates = {
+                model: selectedModel
+            };
+            if (apiKeyInput.value.trim()) {
+                updates.apiKey = apiKeyInput.value.trim();
+            }
+            await window.api.saveSettings(updates);
+            alert('Settings Saved! Restart app to apply.');
+        });
+    </script>
+</body>
+
+</html>

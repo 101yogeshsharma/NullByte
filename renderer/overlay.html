@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+    <style>
+        /* Reset & Base */
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100px;
+            /* Start compact */
+            /* Background & Glass Effect - INCREASED TRANSPARENCY */
+            background: rgba(20, 20, 25, 0.45);
+            color: #e0e0e0;
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            transition: height 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            overflow: hidden;
+            position: relative;
+            pointer-events: none;
+            /* Ghost Mode */
+            user-select: none;
+        }
+
+        /* Strip Mode (Top Bar) */
+        .strip-header {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 100px;
+            gap: 16px;
+            -webkit-app-region: drag;
+            flex-shrink: 0;
+            z-index: 20;
+            /* INCREASED TRANSPARENCY for header */
+            background: rgba(20, 20, 25, 0.6);
+        }
+
+        /* Left Section: Logo & Model */
+        .header-left {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+            min-width: 130px;
+            -webkit-app-region: no-drag;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 15px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 2px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        .logo-icon {
+            width: 14px;
+            height: 14px;
+            background: #646cff;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Model Dropdown Trigger */
+        .model-selector {
+            position: relative;
+        }
+
+        .model-btn {
+            background: rgba(42, 42, 48, 0.8);
+            color: #ddd;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 130px;
+            justify-content: space-between;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .model-btn:hover {
+            background: rgba(51, 51, 51, 0.9);
+            border-color: #666;
+        }
+
+        /* Model Dropdown Menu - FIXED POSITIONING */
+        .model-dropdown {
+            position: fixed;
+            top: 85px;
+            left: 20px;
+            background: rgba(35, 35, 40, 0.95);
+            border: 1px solid #444;
+            border-radius: 8px;
+            width: 280px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 9999;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+            /* MUST BE INTERACTIVE */
+            user-select: none;
+        }
+
+        .model-dropdown.show {
+            display: block;
+        }
+
+        .model-option {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .model-option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .model-option.selected-key {
+            background: rgba(100, 108, 255, 0.2);
+            border-left: 3px solid #646cff;
+        }
+
+        .model-option.active {
+            border-left: 3px solid #646cff;
+            background: rgba(100, 108, 255, 0.1);
+        }
+
+        .opt-name {
+            font-weight: 600;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .opt-meta {
+            font-size: 10px;
+            color: #999;
+            display: flex;
+            gap: 8px;
+        }
+
+        .opt-badge {
+            background: #333;
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
+        /* Middle Section: Shortcuts */
+        .shortcuts-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 6px 10px;
+            border-radius: 12px;
+            -webkit-app-region: no-drag;
+        }
+
+        .shortcut-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #ccc;
+            cursor: default;
+            min-width: 30px;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .shortcut-keys {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: #fff;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            margin-bottom: 2px;
+            font-weight: bold;
+        }
+
+        .shortcut-label {
+            font-size: 9px;
+            opacity: 0.8;
+        }
+
+        /* Right Section: Thumbnails */
+        .thumbnails-strip {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 6px;
+            height: 70px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            -webkit-app-region: no-drag;
+            margin-left: 5px;
+        }
+
+        .thumb-item {
+            width: 80px;
+            height: 56px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            overflow: hidden;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .thumb-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumb-item:hover {
+            border-color: #646cff;
+        }
+
+        /* Loader */
+        .loader {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #fff;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Solution Area */
+        .solution-area {
+            flex: 1;
+            display: none;
+            overflow-y: auto;
+            padding: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(10, 10, 15, 0.25);
+            -webkit-app-region: no-drag;
+            min-height: 200px;
+            pointer-events: none;
+        }
+
+        /* Typography */
+        .solution-area h1 {
+            font-size: 18px;
+            color: #fff;
+            margin-top: 0;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .solution-area h2 {
+            font-size: 16px;
+            color: #eee;
+            margin-top: 15px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        .solution-area p {
+            color: #ddd;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .solution-area ul {
+            margin-left: 20px;
+            color: #ddd;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .solution-area pre {
+            background: rgba(20, 20, 25, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 15px 0;
+            pointer-events: none;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Dropdown Container -->
+    <div class="model-dropdown" id="model-list"></div>
+
+    <div id="app">
+        <!-- Strip Header -->
+        <div class="strip-header">
+
+            <!-- Left: Logo & Model -->
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon"></span>
+                    NullByte
+                    <div id="loading-spinner" class="loader"></div>
+                </div>
+
+                <div class="model-selector">
+                    <div class="model-btn" id="model-trigger">
+                        <span id="current-model-name">Loading...</span>
+                        <span>▾</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle: Shortcuts -->
+            <div class="shortcuts-bar">
+                <div class="shortcut-badge" title="Capture Screenshot">
+                    <span class="shortcut-keys">⇧S</span>
+                    <span class="shortcut-label">Cap</span>
+                </div>
+                <div class="shortcut-badge" title="Solve">
+                    <span class="shortcut-keys">⇧D</span>
+                    <span class="shortcut-label">Solve</span>
+                </div>
+                <div class="shortcut-badge" title="Scroll">
+                    <span class="shortcut-keys">⇧↕</span>
+                    <span class="shortcut-label">Scroll</span>
+                </div>
+                <div class="shortcut-badge" title="Toggle Overlay">
+                    <span class="shortcut-keys">⇧Q</span>
+                    <span class="shortcut-label">Hide</span>
+                </div>
+            </div>
+
+            <!-- Thumbnails (Right Side) -->
+            <div class="thumbnails-strip" id="thumbnails">
+                <div style="color: #ccc; font-size: 11px; padding: 0 10px; text-shadow: 0 1px 2px black;">Waiting for
+                    Capture...</div>
+            </div>
+
+        </div>
+
+        <!-- Solution Content -->
+        <div class="solution-area" id="solution-content">
+            <p style="text-align: center; color: #ccc; margin-top: 10px;">
+                Solution output area.
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+
+    <script>
+        const app = document.getElementById('app');
+        const thumbnails = document.getElementById('thumbnails');
+        const solutionContent = document.querySelector('.solution-area');
+        const spinner = document.getElementById('loading-spinner');
+        const modelTrigger = document.getElementById('model-trigger');
+        const modelList = document.getElementById('model-list');
+        const currentModelLabel = document.getElementById('current-model-name');
+
+        // Limits Data
+        const MODEL_LIMITS = {
+            'gemini-1.5-flash': { rpm: '15 RPM', tpm: '1M TPM' },
+            'gemini-1.5-pro': { rpm: '2 RPM', tpm: '32K TPM' },
+            'gemini-2.0-flash': { rpm: '15 RPM', tpm: '1M TPM' },
+            'gemini-2.0-flash-exp': { rpm: '15 RPM', tpm: 'Unlimited' },
+            'gemini-2.5-flash': { rpm: '5 RPM', tpm: '250K TPM' },
+            'gemma-3-27b-it': { rpm: '30 RPM', tpm: '15K TPM' },
+            'gemini-pro': { rpm: '60 RPM', tpm: 'Unlimited' }
+        };
+
+        // Auto-Resize Logic
+        let isExpanded = false;
+        let isDropdownOpen = false;
+
+        const HEIGHT_STRIP = 100; // Small height
+        const WIDTH = 640;
+        const DROPDOWN_HEIGHT_BUFFER = 400; // Height needed to show dropdown
+        const MAX_HEIGHT = 800;
+
+        function adjustHeight() {
+            let targetHeight = HEIGHT_STRIP;
+
+            if (isExpanded) {
+                app.style.height = 'auto';
+                const appHeight = app.scrollHeight;
+                targetHeight = Math.min(Math.max(appHeight, HEIGHT_STRIP), MAX_HEIGHT);
+                app.style.height = targetHeight + 'px';
+            } else if (isDropdownOpen) {
+                targetHeight = Math.max(HEIGHT_STRIP, DROPDOWN_HEIGHT_BUFFER);
+                app.style.height = HEIGHT_STRIP + 'px';
+            } else {
+                app.style.height = HEIGHT_STRIP + 'px';
+            }
+
+            requestAnimationFrame(() => {
+                window.api.resizeWindow({ width: WIDTH, height: targetHeight });
+            });
+        }
+
+        function toggleExpand(forceState = null) {
+            if (forceState !== null) isExpanded = forceState;
+            else isExpanded = !isExpanded;
+
+            if (isExpanded) {
+                isDropdownOpen = false;
+                modelList.classList.remove('show');
+                window.api.setIgnoreMouse(true); // Close dropdown = ghost mode
+                solutionContent.style.display = 'block';
+            } else {
+                solutionContent.style.display = 'none';
+            }
+
+            adjustHeight();
+        }
+
+        // --- Model Logic ---
+        async function loadModels() {
+            try {
+                const current = await window.api.getCurrentModel();
+                if (current) currentModelLabel.textContent = current.split('/')[1] || current;
+
+                const models = await window.api.getModels();
+                const displayModels = models.length > 0 ? models : [
+                    { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B' },
+                    { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash' }
+                ];
+
+                modelList.innerHTML = '';
+                displayModels.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = 'model-option ' + (m.id === current ? 'active' : '');
+                    const limits = MODEL_LIMITS[m.id] || { rpm: '-', tpm: '-' };
+                    div.innerHTML = `
+                    <div class="opt-name">${m.displayName || m.id}</div>
+                    <div class="opt-meta">
+                        <span class="opt-badge">${limits.rpm}</span>
+                        <span class="opt-badge">${limits.tpm}</span>
+                    </div>
+                `;
+                    div.onclick = async () => {
+                        await window.api.setModel(m.id);
+                        currentModelLabel.textContent = m.displayName || m.id;
+                        isDropdownOpen = false;
+                        modelList.classList.remove('show');
+                        window.api.setIgnoreMouse(true);
+                        adjustHeight();
+                        updateSelection();
+                    };
+                    modelList.appendChild(div);
+                });
+            } catch (e) {
+                console.error("Model load error", e);
+                currentModelLabel.textContent = "Error";
+            }
+        }
+
+        // Toggle Dropdown (Click Handler - might not work in ghost mode, but logic here for backup)
+        modelTrigger.onclick = (e) => {
+            // e.stopPropagation(); // App is pointer-events: none, so this click only works if manually enabled. 
+            // But logic is cleaner separated.
+        };
+
+        // Close dropdown on outside click
+        document.addEventListener('click', (e) => {
+            if (isDropdownOpen && !e.target.closest('.model-dropdown') && !e.target.closest('.model-btn')) {
+                isDropdownOpen = false;
+                modelList.classList.remove('show');
+                window.api.setIgnoreMouse(true);
+                adjustHeight();
+            }
+        });
+
+        loadModels();
+
+        // DELAYED GHOST MODE: Allow 500ms for window to grab focus (fixes shortcuts), then go ghost.
+        setTimeout(() => {
+            window.api.setIgnoreMouse(true);
+        }, 500);
+
+        // Thumbnails
+        window.api.onUpdateScreenshots((paths) => {
+            thumbnails.innerHTML = '';
+            if (paths.length === 0) {
+                thumbnails.innerHTML = '<div style="color: #ccc; font-size: 11px; padding: 0 10px; text-shadow: 0 1px 2px black;">Waiting for Capture...</div>';
+                return;
+            }
+            paths.forEach(path => {
+                const div = document.createElement('div');
+                div.className = 'thumb-item';
+                const cleanPath = path.replace(/\\/g, '/');
+                div.innerHTML = `<img src="file://${cleanPath}" />`;
+                thumbnails.appendChild(div);
+            });
+            thumbnails.scrollLeft = thumbnails.scrollWidth;
+        });
+
+        // States
+        window.api.onForceCollapse(() => toggleExpand(false));
+        window.api.onForceExpand(() => toggleExpand(true));
+
+        window.api.onGeminiStatus((status) => {
+            if (status === 'thinking') {
+                spinner.style.display = 'inline-block';
+                toggleExpand(true);
+                solutionContent.innerHTML = '<p>Analyzing...</p>';
+            } else {
+                spinner.style.display = 'none';
+            }
+        });
+
+        window.api.onGeminiResponse((text) => {
+            solutionContent.innerHTML = marked.parse(text);
+            Prism.highlightAll();
+            adjustHeight();
+        });
+
+        // Scrolling Fix
+        window.api.onScrollEvent((direction) => {
+            if (isExpanded && solutionContent.style.display !== 'none') {
+                const scrollAmount = 150;
+                if (direction === 'up') {
+                    solutionContent.scrollTop -= scrollAmount;
+                } else if (direction === 'down') {
+                    solutionContent.scrollTop += scrollAmount;
+                } else if (direction === 'left') {
+                    const codeBlocks = solutionContent.querySelectorAll('pre');
+                    codeBlocks.forEach(block => block.scrollLeft -= scrollAmount);
+                    solutionContent.scrollLeft -= scrollAmount;
+                } else if (direction === 'right') {
+                    const codeBlocks = solutionContent.querySelectorAll('pre');
+                    codeBlocks.forEach(block => block.scrollLeft += scrollAmount);
+                    solutionContent.scrollLeft += scrollAmount;
+                }
+            }
+        });
+
+        // --- Dropdown Keyboard Navigation & Logic ---
+        let selectedIndex = 0;
+
+        function updateSelection() {
+            const options = document.querySelectorAll('.model-option');
+            if (options.length === 0) return;
+
+            // Clamp
+            if (selectedIndex < 0) selectedIndex = options.length - 1;
+            if (selectedIndex >= options.length) selectedIndex = 0;
+
+            options.forEach((opt, idx) => {
+                if (idx === selectedIndex) {
+                    opt.classList.add('selected-key');
+                    opt.scrollIntoView({ block: 'nearest' });
+                } else {
+                    opt.classList.remove('selected-key');
+                }
+            });
+        }
+
+        // Toggle Listener (Triggered by Ctrl+Shift+M)
+        window.api.onToggleModelDropdown(() => {
+            console.log("Toggle Dropdown Received");
+            isDropdownOpen = !isDropdownOpen;
+
+            if (isDropdownOpen) {
+                modelList.classList.add('show');
+                window.api.setIgnoreMouse(false); // Enable Interactions!
+
+                // Allow time for DOM to paint then focus
+                requestAnimationFrame(() => {
+                    selectedIndex = 0;
+                    updateSelection();
+                });
+            } else {
+                modelList.classList.remove('show');
+                window.api.setIgnoreMouse(true); // Disable Interactions!
+            }
+            adjustHeight();
+        });
+
+        // Global Keydown (Only when interactive/focused)
+        window.addEventListener('keydown', (e) => {
+            if (!isDropdownOpen) return;
+
+            const options = document.querySelectorAll('.model-option');
+            if (options.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                selectedIndex++;
+                updateSelection();
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                selectedIndex--;
+                updateSelection();
+                e.preventDefault();
+            } else if (e.key === 'Enter') {
+                if (selectedIndex >= 0 && selectedIndex < options.length) {
+                    options[selectedIndex].click();
+                }
+                e.preventDefault();
+            } else if (e.key === 'Escape') {
+                // Close dropdown
+                isDropdownOpen = false;
+                modelList.classList.remove('show');
+                window.api.setIgnoreMouse(true);
+                adjustHeight();
+            }
+        });
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,62 @@
+{
+    "name": "nullbyte",
+    "productName": "NullByte",
+    "version": "0.1.0-alpha",
+    "description": "NullByte - AI Coding Assistant Overlay powered by Gemini",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron .",
+        "build": "electron-builder"
+    },
+    "keywords": [
+        "electron",
+        "gemini",
+        "overlay",
+        "ai",
+        "coding-assistant"
+    ],
+    "author": "Yogesh Sharma",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/101yogeshsharma/NullByte.git"
+    },
+    "homepage": "https://github.com/101yogeshsharma/NullByte#readme",
+    "bugs": {
+        "url": "https://github.com/101yogeshsharma/NullByte/issues"
+    },
+    "dependencies": {
+        "@google/generative-ai": "^0.21.0",
+        "marked": "^12.0.0",
+        "prismjs": "^1.29.0"
+    },
+    "devDependencies": {
+        "electron": "^31.0.0",
+        "electron-builder": "^26.7.0"
+    },
+    "build": {
+        "appId": "com.nullbyte.app",
+        "productName": "NullByte",
+        "directories": {
+            "output": "dist"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "assets/icon.png",
+            "requestedExecutionLevel": "asInvoker"
+        },
+        "nsis": {
+            "oneClick": true,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": false,
+            "createDesktopShortcut": false,
+            "createStartMenuShortcut": false
+        },
+        "files": [
+            "**/*",
+            "!dist/*",
+            "!**/*.map"
+        ]
+    }
+}

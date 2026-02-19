@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NullByte Setup</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .container {
+            background: #2d2d2d;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            width: 80%;
+            max-width: 400px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        p {
+            margin-bottom: 25px;
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #1a1a1a;
+            color: #fff;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #646cff;
+        }
+
+        button {
+            background: #646cff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            background: #535bf2;
+        }
+
+        .link {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .link a {
+            color: #888;
+            text-decoration: none;
+        }
+
+        .link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Welcome to NullByte</h1>
+        <p>To get started, please enter your Google Gemini API Key. This will be stored securely on your device.</p>
+        <input type="password" id="apiKey" placeholder="Enter API Key (AIzaSy...)" />
+        <button id="saveBtn">Start Coding</button>
+        <div class="link">
+            <a href="#" onclick="window.api.openExternal('https://aistudio.google.com/app/apikey')">Get an API Key</a>
+        </div>
+    </div>
+    <script>
+        document.getElementById('saveBtn').addEventListener('click', async () => {
+            const key = document.getElementById('apiKey').value.trim();
+            if (key) {
+                await window.api.saveApiKey(key);
+            } else {
+                alert('Please enter a valid API Key');
+            }
+        });
+    </script>
+</body>
+
+</html>
