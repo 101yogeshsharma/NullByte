@@ -2,7 +2,7 @@
     "name": "nullbyte",
     "productName": "NullByte",
     "version": "0.1.0-alpha",
-    "description": "NullByte - AI Coding Assistant Overlay powered by Gemini",
+    "description": "NullByte - AI Coding Assistant powered by Gemini",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
@@ -12,7 +12,7 @@
     "keywords": [
         "electron",
         "gemini",
-        "overlay",
+        "desktop-tool",
         "ai",
         "coding-assistant"
     ],

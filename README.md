@@ -1,13 +1,13 @@
-# NullByte — AI Coding Assistant Overlay
+# NullByte — AI Coding Assistant
 
-NullByte is a lightweight Electron-based desktop overlay that gives you instant access to Google's Gemini AI while you code. It sits on top of your IDE, browser, or terminal as a non-intrusive floating panel — perfect for quick code explanations, debugging help, and on-the-fly learning.
+NullByte is a lightweight Electron-based desktop tool that gives you instant access to Google's Gemini AI while you code. It sits on top of your IDE, browser, or terminal as a non-intrusive floating panel — perfect for quick code explanations, debugging help, and on-the-fly learning.
 
 > **⚠️ Disclaimer:** NullByte is designed as a **personal productivity and learning tool**. It is **not** intended for use during interviews, exams, proctored assessments, or any scenario where external assistance is prohibited. Please use this tool ethically and responsibly.
 
 ## ✨ Features
 
-- **Always-On-Top Overlay** — A floating panel that stays visible over your IDE, browser, or any other application so you can reference AI-generated solutions without switching windows.
-- **Click-Through Mode** — The overlay doesn't interfere with your workflow; mouse events pass through to the application underneath.
+- **Always-On-Top Panel** — A floating panel that stays visible over your IDE, browser, or any other application so you can reference AI-generated solutions without switching windows.
+- **Click-Through Mode** — The panel doesn't interfere with your workflow; mouse events pass through to the application underneath.
 - **Global Hotkeys** — Control everything via keyboard shortcuts without leaving your current app.
 - **Gemini AI Integration** — Leverages Google's latest multimodal AI models for intelligent code analysis and solutions.
 - **Screenshot & Solve** — Capture a portion of your screen (error messages, code snippets, UI bugs) and let AI analyze it instantly.
@@ -53,7 +53,7 @@ NullByte uses Google's Gemini AI under the hood. You'll need a free API key:
 npm run start
 ```
 
-This launches the Electron overlay directly. You can also use:
+This launches NullByte directly. You can also use:
 
 ```bash
 npm run dev
@@ -98,26 +98,26 @@ NullByte/
 
 1. **Launch** NullByte.
 2. **Enter your API Key** — Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/) and paste it when prompted.
-3. **Use keyboard shortcuts** to interact with the overlay:
+3. **Use keyboard shortcuts** to interact with NullByte:
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl + Shift + S` | Capture a screenshot (adds to queue) |
 | `Ctrl + Shift + G` / `Ctrl + Shift + Enter` | Solve with AI |
 | `Ctrl + Shift + D` | Solve (alternative shortcut) |
-| `Ctrl + Shift + Q` | Toggle overlay visibility |
+| `Ctrl + Shift + Q` | Toggle NullByte visibility |
 | `Ctrl + Shift + X` | Clear screenshot queue |
 | `Ctrl + Shift + M` | Toggle AI model selection |
 | `Ctrl + Shift + Arrow Keys` | Scroll through the solution |
 
-4. **Workflow**: Capture a screenshot of a coding problem or error → press Solve → read the AI-generated explanation and solution right in the overlay.
+4. **Workflow**: Capture a screenshot of a coding problem or error → press Solve → read the AI-generated explanation and solution right in NullByte.
 
 ## 🔧 Technical Details
 
-- **Overlay Window** — Built as an Electron `BrowserWindow` with `alwaysOnTop` enabled, using a frameless, transparent design for minimal visual footprint.
-- **Click-Through** — Uses Electron's `setIgnoreMouseEvents` API so the overlay doesn't block interaction with underlying apps.
-- **Compact UI** — The overlay uses a toolbar-style window to keep the interface minimal and out of the way.
-- **Self-Hiding Capture** — The overlay temporarily hides before taking screenshots to ensure clean captures of the content beneath it.
+- **Always-On-Top Window** — Built as an Electron `BrowserWindow` with `alwaysOnTop` enabled, using a frameless, transparent design for minimal visual footprint.
+- **Click-Through** — Uses Electron's `setIgnoreMouseEvents` API so the tool doesn't block interaction with underlying apps.
+- **Compact UI** — Uses a toolbar-style window to keep the interface minimal and out of the way.
+- **Self-Hiding Capture** — NullByte temporarily hides before taking screenshots to ensure clean captures of the content beneath it.
 
 ## 🎨 Customization
 
@@ -129,7 +129,7 @@ NullByte/
 | Problem | Solution |
 |---|---|
 | `npm install` fails | Make sure you have Node.js v18+ installed. Run `node -v` to check. |
-| Overlay doesn't appear | Press `Ctrl + Shift + Q` to toggle visibility. Check if the app is running in the system tray. |
+| NullByte doesn't appear | Press `Ctrl + Shift + Q` to toggle visibility. Check if the app is running in the system tray. |
 | "Invalid API Key" error | Double-check your Gemini API key at [Google AI Studio](https://aistudio.google.com/). Make sure there are no extra spaces. |
 | Build fails with privilege errors | Run your terminal as **Administrator** and try again. |
 | Screenshots are blank | Make sure you're not running the app in a virtual machine, as some VMs restrict screen capture APIs. |
@@ -155,7 +155,7 @@ Contributions are welcome! Here's how you can help:
 
 ### Ideas for Contributions
 - 🐛 Bug fixes and stability improvements
-- 🎨 UI/UX enhancements for the overlay
+- 🎨 UI/UX enhancements
 - 🌐 Multi-platform support (macOS, Linux)
 - 📝 Documentation improvements
 - ✨ New AI model integrations

@@ -74,7 +74,7 @@ jobs:
             ## NullByte ${{ github.ref_name }}
 
             ### 📥 Download
-            Download the **NullByte.exe** installer below and run it to install NullByte on your Windows machine.
+            Download the **NullByte-${{ github.ref_name }}.exe** installer below and run it to install NullByte on your Windows machine.
 
             ### 🔑 Setup
             You'll need a free Gemini API key from [Google AI Studio](https://aistudio.google.com/) to use NullByte.

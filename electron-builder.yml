@@ -7,7 +7,7 @@ win:
   target: nsis
   icon: assets/icon.png
   requestedExecutionLevel: asInvoker
-  artifactName: NullByte.${ext}
+  artifactName: NullByte-v${version}.${ext}
 nsis:
   oneClick: true
   perMachine: false

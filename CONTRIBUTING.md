@@ -83,7 +83,7 @@ We use a simple prefix convention for commit messages:
 **Examples:**
 ```
 Add: global shortcut for model selection
-Fix: overlay not appearing after screenshot
+Fix: NullByte not appearing after screenshot
 Update: Gemini prompt for better code output
 Docs: add troubleshooting section to README
 ```
@@ -132,7 +132,7 @@ Before submitting a PR, make sure:
 ## 💡 Areas Where We Need Help
 
 - 🐛 Bug fixes and stability improvements
-- 🎨 UI/UX enhancements for the overlay design
+- 🎨 UI/UX enhancements
 - 🌐 Multi-platform support (macOS and Linux)
 - ✨ New AI model integrations
 - 📝 Documentation and guides
