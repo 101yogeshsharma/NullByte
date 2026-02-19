@@ -1,7 +1,7 @@
 {
     "name": "nullbyte",
     "productName": "NullByte",
-    "version": "0.1.0-alpha",
+    "version": "0.1.0",
     "description": "NullByte - AI Coding Assistant powered by Gemini",
     "main": "main.js",
     "scripts": {

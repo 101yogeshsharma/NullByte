@@ -120,7 +120,7 @@ function createOverlayWindow() {
 
   // Initial state: Horizontal Strip
   mainWindow = new BrowserWindow({
-    width: 600, // Initial width, resizeable
+    width: 850, // Initial width, flexible
     height: 130, // Start as a strip
     x: Math.round((width - 600) / 2),
     y: 50,
@@ -219,12 +219,8 @@ async function captureScreenshot(solveImmediately = false) {
     const primaryDisplay = screen.getPrimaryDisplay();
     
     // --- STEALTH: Hide overlay before capturing so it's never in the screenshot ---
-    const wasVisible = mainWindow && mainWindow.isVisible();
-    if (mainWindow && wasVisible) {
-      mainWindow.hide();
-      // Small delay to ensure the window is fully hidden before capture
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    // --- STEALTH: setContentProtection(true) handles hiding from capture automatically on Windows.
+    // No need to manually hide/show, which causes blinking.
     
     // desktopCapturer is safer than user-mode hooks
     const sources = await desktopCapturer.getSources({ 
@@ -244,10 +240,7 @@ async function captureScreenshot(solveImmediately = false) {
       log(`Screenshot captured: ${filePath}`);
 
       // --- Restore overlay after capture ---
-      if (!mainWindow) createOverlayWindow();
-      
       if (mainWindow) {
-        mainWindow.show();
         // Force window to be 'active' for a split second to ensure painting
         mainWindow.setIgnoreMouseEvents(false);
         setTimeout(() => {

@@ -7,14 +7,14 @@ win:
   target: nsis
   icon: assets/icon.png
   requestedExecutionLevel: asInvoker
-  artifactName: NullByte-v${version}.${ext}
+  artifactName: NullByte.v${version}.${ext}
 nsis:
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
   shortcutName: NullByte
   include: build/installer.nsh
-  createDesktopShortcut: false
-  createStartMenuShortcut: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
   installerIcon: assets/icon.png
   uninstallerIcon: assets/icon.png

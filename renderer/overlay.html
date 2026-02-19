@@ -388,6 +388,10 @@
                     <span class="shortcut-keys">Ctrl+Shift+Q</span>
                     <span class="shortcut-label">Hide/Show</span>
                 </div>
+                <div class="shortcut-badge" title="Clear Screenshots">
+                    <span class="shortcut-keys">Ctrl+Shift+X</span>
+                    <span class="shortcut-label" id="clear-label">Clear (0)</span>
+                </div>
             </div>
 
             <!-- Thumbnails (Right Side) -->
@@ -395,7 +399,6 @@
                 <div style="color: #ccc; font-size: 11px; padding: 0 10px; text-shadow: 0 1px 2px black;">Waiting for
                     Capture...</div>
             </div>
-
         </div>
 
         <!-- Solution Content -->
@@ -421,6 +424,7 @@
         const modelTrigger = document.getElementById('model-trigger');
         const modelList = document.getElementById('model-list');
         const currentModelLabel = document.getElementById('current-model-name');
+        const clearLabel = document.getElementById('clear-label');
 
         // Limits Data
         const MODEL_LIMITS = {
@@ -438,24 +442,24 @@
         let isDropdownOpen = false;
 
         const HEIGHT_STRIP = 100; // Small height
-        const WIDTH = 640;
+        const WIDTH = 850;
         const DROPDOWN_HEIGHT_BUFFER = 400; // Height needed to show dropdown
         const MAX_HEIGHT = 800;
 
         function adjustHeight() {
             let targetHeight = HEIGHT_STRIP;
+            const screenHeight = window.screen.availHeight;
+            const safeMaxHeight = Math.min(MAX_HEIGHT, screenHeight * 0.85); // Use 85% of screen height max
 
             if (isExpanded) {
                 app.style.height = 'auto';
                 const appHeight = app.scrollHeight;
-                targetHeight = Math.min(Math.max(appHeight, HEIGHT_STRIP), MAX_HEIGHT);
-                app.style.height = targetHeight + 'px';
+                targetHeight = Math.min(Math.max(appHeight, HEIGHT_STRIP), safeMaxHeight);
             } else if (isDropdownOpen) {
                 targetHeight = Math.max(HEIGHT_STRIP, DROPDOWN_HEIGHT_BUFFER);
-                app.style.height = HEIGHT_STRIP + 'px';
-            } else {
-                app.style.height = HEIGHT_STRIP + 'px';
             }
+
+            app.style.height = targetHeight + 'px';
 
             requestAnimationFrame(() => {
                 window.api.resizeWindow({ width: WIDTH, height: targetHeight });
@@ -545,6 +549,8 @@
         // Thumbnails
         window.api.onUpdateScreenshots((paths) => {
             thumbnails.innerHTML = '';
+            if (clearLabel) clearLabel.textContent = `Clear (${paths.length})`; // Update count
+
             if (paths.length === 0) {
                 thumbnails.innerHTML = '<div style="color: #ccc; font-size: 11px; padding: 0 10px; text-shadow: 0 1px 2px black;">Waiting for Capture...</div>';
                 return;
