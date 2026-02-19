@@ -3,19 +3,26 @@
     "productName": "NullByte",
     "version": "0.1.0-alpha",
     "description": "NullByte - AI Coding Assistant powered by Gemini",
+    "keywords": [
+        "electron",
+        "ai-assistant",
+        "coding-tool",
+        "gemini-api",
+        "developer-productivity",
+        "overlay",
+        "screen-capture",
+        "stealth-mode",
+        "code-analysis",
+        "gemma-3",
+        "gemini-3",
+        "desktop-tool"
+    ],
     "main": "main.js",
     "scripts": {
         "start": "electron .",
         "dev": "electron .",
         "build": "electron-builder"
     },
-    "keywords": [
-        "electron",
-        "gemini",
-        "desktop-tool",
-        "ai",
-        "coding-assistant"
-    ],
     "author": "Yogesh Sharma",
     "license": "Apache-2.0",
     "repository": {
@@ -47,11 +54,11 @@
             "requestedExecutionLevel": "asInvoker"
         },
         "nsis": {
-            "oneClick": true,
+            "oneClick": false,
             "perMachine": false,
-            "allowToChangeInstallationDirectory": false,
-            "createDesktopShortcut": false,
-            "createStartMenuShortcut": false
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true
         },
         "files": [
             "**/*",
