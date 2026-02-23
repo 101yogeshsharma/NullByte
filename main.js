@@ -332,6 +332,10 @@ async function solveWithGemini() {
     
     if (mainWindow) mainWindow.webContents.send('gemini-status', 'done');
 
+    // Auto-clear screenshots after successful solution
+    clearScreenshots();
+    log('Screenshots auto-cleared after successful solution.');
+
   } catch (error) {
     log(`Gemini Error: ${error.message}`);
     if (mainWindow) mainWindow.webContents.send('gemini-response', `Error: ${error.message} \n\nCheck your API Key in Settings.`);
