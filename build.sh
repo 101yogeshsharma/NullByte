@@ -28,7 +28,7 @@ export CSC_IDENTITY_AUTO_DISCOVERY=false
 rm -rf dist
 
 # Run build
-npm run build -- --win nsis
+npm run build -- --config electron-builder.yml --win nsis
 
 if [ $? -eq 0 ]; then
     echo ""

@@ -5,7 +5,7 @@ directories:
   app: .
 win:
   target: nsis
-  icon: assets/icon.png
+  icon: assets/icons/win/icon.ico
   requestedExecutionLevel: asInvoker
   artifactName: NullByte.v${version}.${ext}
 nsis:
@@ -16,5 +16,5 @@ nsis:
   include: build/installer.nsh
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  installerIcon: assets/icon.png
-  uninstallerIcon: assets/icon.png
+  installerIcon: assets/icons/win/icon.ico
+  uninstallerIcon: assets/icons/win/icon.ico

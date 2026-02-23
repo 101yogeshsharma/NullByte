@@ -43,23 +43,6 @@
         "electron-builder": "^26.7.0"
     },
     "build": {
-        "appId": "com.nullbyte.app",
-        "productName": "NullByte",
-        "directories": {
-            "output": "dist"
-        },
-        "win": {
-            "target": "nsis",
-            "icon": "assets/icon.png",
-            "requestedExecutionLevel": "asInvoker"
-        },
-        "nsis": {
-            "oneClick": false,
-            "perMachine": false,
-            "allowToChangeInstallationDirectory": true,
-            "createDesktopShortcut": true,
-            "createStartMenuShortcut": true
-        },
         "files": [
             "**/*",
             "!dist/*",
