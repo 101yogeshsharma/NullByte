@@ -304,7 +304,7 @@ async function solveWithGemini() {
 
     const prompt = `Analyze the attached image(s). Provide the direct, correct answer or solution to the question, problem, or task shown.
     - If it is a coding problem, output ONLY the fully functional code.
-    - If it is a multiple-choice question, output ONLY the correct option(s).
+    - If it is a multiple-choice question, provide a list of ONLY the correct option(s), with each correct option on a new line. Do not output all options in a single row.
     - If it is a language/communication question, output ONLY the required response or correction.
     - If it is an aptitude/IQ test, output ONLY the logical answer or next item in sequence.
     - Do NOT include any explanations, reasoning, or conversational filler.`;
