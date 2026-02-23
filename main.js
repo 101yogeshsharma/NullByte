@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, shell, Tray, Menu, safeStorage, dialog } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -19,7 +19,7 @@ let mainWindow = null; // The overlay
 let setupWindow = null;
 let settingsWindow = null;
 let tray = null;
-let trayIconPath = path.join(__dirname, 'assets', 'icon.png'); // Placeholder path
+let trayIconPath = path.join(__dirname, 'assets', 'icon.png');
 let screenshots = []; // Store screenshot paths
 let geminiModel = 'gemma-3-27b-it'; // User requested "Gemini 3 27B" (Gemma 3 27B)
 let apiKey = null;
@@ -103,7 +103,7 @@ function createSetupWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false // Specific requirement for some interactions
+      sandbox: false
     },
     autoHideMenuBar: true,
     resizable: false
@@ -185,7 +185,7 @@ function createSettingsWindow() {
     autoHideMenuBar: true
   });
 
-  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html')); // We'll need this file
+  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   settingsWindow.on('closed', () => settingsWindow = null);
 }
 
@@ -280,9 +280,7 @@ async function solveWithGemini() {
   
   // WAIT FOR WINDOW LOAD if newly created
   if (mainWindow && mainWindow.webContents.isLoading()) {
-      console.log("Waiting for window load...");
       await new Promise(resolve => mainWindow.webContents.once('did-finish-load', resolve));
-      console.log("Window loaded.");
   }
   
   if (screenshots.length === 0) {
@@ -342,7 +340,6 @@ async function solveWithGemini() {
     if (mainWindow) mainWindow.webContents.send('gemini-status', 'error');
   }
 }
-
 
 // --- App Lifecycle ---
 
@@ -467,27 +464,6 @@ if (!gotTheLock) {
   });
 }
 
-// --- Gemini Helpers ---
-async function fetchAvailableModels(apiKey) {
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    if (!data.models) return [];
-    
-    return data.models
-      .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-      .map(m => ({
-        id: m.name.replace('models/', ''),
-        displayName: m.displayName || m.name
-      }))
-      .sort((a, b) => b.id.localeCompare(a.id)); 
-  } catch (error) {
-    log(`Failed to fetch models: ${error.message}`);
-    return [];
-  }
-}
-
 // IPC Handlers
 ipcMain.handle('save-api-key', (event, key) => {
   saveConfig({ apiKey: key });
@@ -497,9 +473,7 @@ ipcMain.handle('save-api-key', (event, key) => {
 });
 
 ipcMain.handle('get-settings', () => {
-    // Return safe settings (no raw key)
-    const config = loadConfig();
-    return { model: geminiModel, hasKey: !!apiKey }; // Don't return the key itself usually, but for user edit maybe needed? Or just overwrite.
+    return { model: geminiModel, hasKey: !!apiKey };
 });
 
 ipcMain.handle('save-settings', (event, settings) => {
@@ -508,15 +482,12 @@ ipcMain.handle('save-settings', (event, settings) => {
     if (settings.model) geminiModel = settings.model;
 });
 
-ipcMain.handle('get-models', async () => {
-    if (!apiKey) return [];
-    return await fetchAvailableModels(apiKey);
-});
+
 
 // IPC: Set Model
 ipcMain.handle('set-model', (event, modelId) => {
   geminiModel = modelId;
-  saveConfig({ model: modelId }); // Persist
+  saveConfig({ model: modelId });
   return true;
 });
 
@@ -548,5 +519,4 @@ ipcMain.on('resize-window', (event, { width, height }) => {
 // Clean up
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
-  // Clear temp files logic if desired
 });

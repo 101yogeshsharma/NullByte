@@ -49,11 +49,10 @@
 
     <label>Gemini Model</label>
     <select id="model">
-        <option value="" disabled selected>Loading models...</option>
-        <option value="custom">Custom Model ID...</option>
+        <option value="gemma-3-27b-it">Gemma 3 27B</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
     </select>
-    <input type="text" id="customModelInput" placeholder="e.g. gemini-3.0-pro-exp"
-        style="display: none; margin-top: -10px;">
 
     <label>Update API Key</label>
     <input type="password" id="apiKey" placeholder="Leave empty to keep current" />
@@ -62,114 +61,18 @@
 
     <script>
         const modelSelect = document.getElementById('model');
-        const customModelInput = document.getElementById('customModelInput');
         const apiKeyInput = document.getElementById('apiKey');
 
-        const logDiv = document.getElementById('connection-log');
-        const testBtn = document.getElementById('test-key');
-
-        function log(msg, isError = false) {
-            logDiv.style.display = 'block';
-            logDiv.style.color = isError ? '#ff6b6b' : '#aaa';
-            logDiv.textContent = msg;
-        }
-
-        testBtn.addEventListener('click', async () => {
-            log("Testing connection to Google AI...");
-            try {
-                // Forcing a refresh of models
-                const models = await window.api.getModels();
-                if (models && models.length > 0) {
-                    log(`Success! Your key is valid.\nAvailable Models:\n` + models.map(m => `• ${m.id}`).join('\n'), false);
-
-                    // Auto-populate dropdown if list was empty before
-                    if (modelSelect.options[0].disabled) {
-                        modelSelect.innerHTML = '';
-                        models.forEach(m => {
-                            const opt = document.createElement('option');
-                            opt.value = m.id;
-                            opt.textContent = `${m.displayName} (${m.id})`;
-                            modelSelect.appendChild(opt);
-                        });
-                        const customOpt = document.createElement('option');
-                        customOpt.value = 'custom';
-                        customOpt.textContent = 'Custom Model ID...';
-                        modelSelect.appendChild(customOpt);
-                        modelSelect.value = models[0].id;
-                    }
-                } else {
-                    log("Error: Key seems valid logic-wise, but Google returned NO models. Check strict API key permissions or region.", true);
-                }
-            } catch (e) {
-                log("Connection Error: " + e.message, true);
-            }
-        });
-
-        // Toggle custom input
-        modelSelect.addEventListener('change', () => {
-            if (modelSelect.value === 'custom') {
-                customModelInput.style.display = 'block';
-            } else {
-                customModelInput.style.display = 'none';
-            }
-        });
-
         // Load settings
-        window.api.getSettings().then(async (settings) => {
-            // Fetch online models
-            const onlineModels = await window.api.getModels();
-            const modelList = onlineModels.length > 0 ? onlineModels : [
-                { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B (User Request)' },
-                { id: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash Exp' },
-                { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
-                { id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash' }
-            ];
-
-            // Rebuild Select
-            modelSelect.innerHTML = ''; // Clear "Loading..."
-
-            // Prioritize specific models if needed, or just list them
-            modelList.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = `${m.displayName} (${m.id})`;
-                modelSelect.appendChild(opt);
-            });
-
-            // Add Custom option at end
-            const customOpt = document.createElement('option');
-            customOpt.value = 'custom';
-            customOpt.textContent = 'Custom Model ID...';
-            modelSelect.appendChild(customOpt);
-
-            // Set Value
+        window.api.getSettings().then(function (settings) {
             if (settings.model) {
-                const found = modelList.find(m => m.id === settings.model);
-                if (found) {
-                    modelSelect.value = settings.model;
-                } else {
-                    modelSelect.value = 'custom';
-                    customModelInput.style.display = 'block';
-                    customModelInput.value = settings.model;
-                }
-            } else {
-                // Default to first if not set
-                if (modelList.length > 0) modelSelect.value = modelList[0].id;
+                modelSelect.value = settings.model;
             }
         });
 
-        document.getElementById('save').addEventListener('click', async () => {
-            let selectedModel = modelSelect.value;
-            if (selectedModel === 'custom') {
-                selectedModel = customModelInput.value.trim();
-                if (!selectedModel) {
-                    alert('Please enter a custom model ID');
-                    return;
-                }
-            }
-
+        document.getElementById('save').addEventListener('click', async function () {
             const updates = {
-                model: selectedModel
+                model: modelSelect.value
             };
             if (apiKeyInput.value.trim()) {
                 updates.apiKey = apiKeyInput.value.trim();

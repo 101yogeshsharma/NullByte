@@ -34,9 +34,7 @@
         "url": "https://github.com/101yogeshsharma/NullByte/issues"
     },
     "dependencies": {
-        "@google/generative-ai": "^0.21.0",
-        "marked": "^12.0.0",
-        "prismjs": "^1.29.0"
+        "@google/generative-ai": "^0.21.0"
     },
     "devDependencies": {
         "electron": "^31.0.0",
@@ -44,9 +42,16 @@
     },
     "build": {
         "files": [
-            "**/*",
-            "!dist/*",
-            "!**/*.map"
+            "main.js",
+            "preload.js",
+            "renderer/overlay.html",
+            "renderer/setup.html",
+            "renderer/settings.html",
+            "assets/icon.png",
+            "assets/icons/win/icon.ico",
+            "build/installer.nsh",
+            "package.json",
+            "node_modules/**/*"
         ]
     }
 }
