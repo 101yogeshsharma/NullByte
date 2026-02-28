@@ -42,7 +42,7 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <span class="pill">system_status: v0.3.0-alpha [RELEASED]</span>
+                <span class="pill" id="version-status">system_status: v0.3.0-alpha [RELEASED]</span>
                 <h1 class="nerd-font"><span class="prompt">&gt;</span> NullByte<span class="cursor">_</span></h1>
                 <p class="code-comment">// Your AI Pair Programmer, Always on Top.<br>/* Lightweight. Transparent.
                     Powered by Gemini. */</p>
@@ -120,6 +120,18 @@
         </div>
     </footer>
 
+    <script>
+        // Dynamically fetch the latest version from package.json
+        fetch('https://raw.githubusercontent.com/101yogeshsharma/NullByte/main/package.json')
+            .then(response => response.json())
+            .then(data => {
+                const versionSpan = document.getElementById('version-status');
+                if (versionSpan && data.version) {
+                    versionSpan.innerText = `system_status: v${data.version} [RELEASED]`;
+                }
+            })
+            .catch(console.error);
+    </script>
 </body>
 
 </html>
