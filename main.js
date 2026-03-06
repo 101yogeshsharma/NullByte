@@ -130,7 +130,7 @@ function createOverlayWindow() {
     skipTaskbar: true,
     hasShadow: false,
     focusable: false, // Stealth: Prevents focus stealing, stays invisible to focus trackers
-    type: 'toolbar', // Stealth: Hides from Alt+Tab window switcher
+    type: process.platform === 'darwin' ? 'panel' : 'toolbar', // Stealth: Hides from Alt+Tab window switcher
     title: '', // Stealth: Empty title to avoid showing in screen share pickers
     show: false, // Stealth: Don't show immediately, prevents window enumeration flash
     minimizable: false,
@@ -356,6 +356,9 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    if (process.platform === 'darwin') {
+      app.dock.hide();
+    }
     ensureDirs();
     const config = loadConfig();
     

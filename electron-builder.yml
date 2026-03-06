@@ -18,3 +18,9 @@ nsis:
   createStartMenuShortcut: true
   installerIcon: assets/icons/win/icon.ico
   uninstallerIcon: assets/icons/win/icon.ico
+mac:
+  target: dmg
+  icon: assets/icons/mac/icon.icns
+  artifactName: NullByte.v${version}.mac.${ext}
+dmg:
+  sign: false

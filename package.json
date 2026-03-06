@@ -21,7 +21,10 @@
     "scripts": {
         "start": "electron .",
         "dev": "electron .",
-        "build": "electron-builder"
+        "build": "electron-builder",
+        "build:win": "electron-builder --win",
+        "build:mac": "electron-builder --mac",
+        "build:linux": "electron-builder --linux"
     },
     "author": "Yogesh Sharma",
     "license": "Apache-2.0",
@@ -49,6 +52,7 @@
             "renderer/settings.html",
             "assets/icon.png",
             "assets/icons/win/icon.ico",
+            "assets/icons/mac/icon.icns",
             "build/installer.nsh",
             "package.json",
             "node_modules/**/*"

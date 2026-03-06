@@ -656,6 +656,13 @@
             window.api.setIgnoreMouse(true);
         }, 500);
 
+        // Update shortcuts for Mac
+        if (navigator.userAgent.includes('Mac')) {
+            document.querySelectorAll('.shortcut-keys').forEach(el => {
+                el.textContent = el.textContent.replace('Ctrl', 'Cmd');
+            });
+        }
+
         // Thumbnails
         window.api.onUpdateScreenshots((paths) => {
             thumbnails.innerHTML = '';

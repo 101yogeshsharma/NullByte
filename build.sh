@@ -19,7 +19,7 @@ fi
 npm install
 
 echo ""
-echo "[2/2] Building Windows Executable (.exe)..."
+echo "[2/2] Building Executable..."
 
 # Set environment variables to prevent common build errors
 export CSC_IDENTITY_AUTO_DISCOVERY=false
@@ -27,8 +27,14 @@ export CSC_IDENTITY_AUTO_DISCOVERY=false
 # Attempt clean build
 rm -rf dist
 
-# Run build
-npm run build -- --config electron-builder.yml --win nsis
+# Run build based on OS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "Detected macOS. Building DMG..."
+    npm run build -- --config electron-builder.yml --mac dmg
+else
+    echo "Detected Windows/Linux. Building Exe..."
+    npm run build -- --config electron-builder.yml --win nsis
+fi
 
 if [ $? -eq 0 ]; then
     echo ""
@@ -39,6 +45,6 @@ if [ $? -eq 0 ]; then
 else
     echo ""
     echo "Build Failed."
-    echo "If you see 'privilege not held' errors, try running this terminal as Administrator."
+    echo "If you see 'privilege not held' errors, try running this terminal as Administrator/Sudo."
     exit 1
 fi
