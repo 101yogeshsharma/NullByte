@@ -24,7 +24,8 @@ NullByte is a lightweight Electron-based desktop tool that gives you instant acc
 The fastest way for macOS users to install NullByte and keep it updated is through our custom Homebrew tap:
 
 ```bash
-brew install 101yogeshsharma/nullbyte/nullbyte
+brew tap 101yogeshsharma/nullbyte
+brew install nullbyte
 ```
 
 *Note: You may be prompted to allow the application to open since it is an unsigned release currently.*
