@@ -34,7 +34,7 @@ brew install nullbyte
 Windows users can soon install NullByte natively via Microsoft's Winget package manager!
 
 ```bash
-winget install 101yogeshsharma.NullByte
+winget install NullByte
 ```
 *(Note: NullByte relies on central submission to `microsoft/winget-pkgs`. If the latest release isn't available immediately, give the pull request a few hours to merge).*
 
