@@ -20,7 +20,18 @@ NullByte is a lightweight Electron-based desktop tool that gives you instant acc
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 1. Install via Homebrew (macOS)
+The fastest way for macOS users to install NullByte and keep it updated is through our custom Homebrew tap:
+
+```bash
+brew install 101yogeshsharma/nullbyte/nullbyte
+```
+
+*Note: You may be prompted to allow the application to open since it is an unsigned release currently.*
+
+### 2. Manual Installation (Windows/Linux/Mac)
+
+#### Prerequisites
 
 Make sure you have the following installed on your machine:
 
@@ -30,14 +41,14 @@ Make sure you have the following installed on your machine:
 | **NPM** | Comes with Node.js | — |
 | **Git** | Any recent version | [git-scm.com](https://git-scm.com/) |
 
-### 1. Clone the Repository
+#### Clone the Repository
 
 ```bash
 git clone https://github.com/101yogeshsharma/NullByte.git
 cd NullByte
 ```
 
-### 2. Install Dependencies
+#### Install Dependencies
 
 ```bash
 npm install
@@ -66,15 +77,19 @@ This launches NullByte directly. You can also use:
 npm run dev
 ```
 
-### 5. Build for Production (Windows `.exe`)
+### 5. Build for Production
 
-To create a standalone installer that you can share or install on any Windows machine:
+To create a standalone installer that you can share or install on any machine:
 
 ```bash
-npm run build
+# To build macOS (.dmg)
+npm run build:mac
+
+# To build Windows (.exe)
+npm run build:win
 ```
 
-The output installer (`NullByte.v0.1.0-alpha.exe`) will be in the `dist/` folder.
+The output installers will be placed in the `dist/` folder.
 
 > **💡 Tip for Git Bash / WSL users:** You can also use the included build script:
 > ```bash
