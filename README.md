@@ -30,7 +30,15 @@ brew install nullbyte
 
 *Note: You may be prompted to allow the application to open since it is an unsigned release currently.*
 
-### 2. Manual Installation (Windows/Linux/Mac)
+### 2. Install via Winget (Windows)
+Windows users can soon install NullByte natively via Microsoft's Winget package manager!
+
+```bash
+winget install 101yogeshsharma.NullByte
+```
+*(Note: NullByte relies on central submission to `microsoft/winget-pkgs`. If the latest release isn't available immediately, give the pull request a few hours to merge).*
+
+### 3. Manual Installation (Windows/Linux/Mac)
 
 #### Prerequisites
 
