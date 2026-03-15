@@ -42,7 +42,7 @@ echo "✅ Pushed codebase"
 # 4. Create GitHub Release
 echo "⏳ Creating GitHub release..."
 DMG_FILE="dist/NullByte-${VERSION}-arm64.dmg"
-EXE_FILE="dist/NullByte Setup ${VERSION}.exe"
+EXE_FILE="dist/NullByte-Setup-${VERSION}.exe"
 gh release create "v$VERSION" "$EXE_FILE" "$DMG_FILE" --title "v$VERSION" --notes "Release v$VERSION"
 echo "✅ GitHub Release created"
 
@@ -62,13 +62,31 @@ git clone https://github.com/101yogeshsharma/homebrew-nullbyte.git "$TAP_DIR"
 cd "$TAP_DIR"
 CASK_FILE="Casks/nullbyte.rb"
 
-# Replace version string
-sed -i '' -e "s/version \".*\"/version \"$VERSION\"/" "$CASK_FILE"
-# Replace sha256 string
-sed -i '' -e "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$CASK_FILE"
+# Create architecture-aware Cask
+cat <<EOF > "$CASK_FILE"
+cask "nullbyte" do
+  arch arm: "arm64", intel: "x64"
+
+  version "$VERSION"
+  sha256 "$SHA256"
+
+  url "https://github.com/101yogeshsharma/NullByte/releases/download/v#{version}/NullByte-#{version}-#{arch}.dmg"
+  name "NullByte"
+  desc "AI Coding Assistant powered by Gemini"
+  homepage "https://github.com/101yogeshsharma/NullByte"
+
+  app "NullByte.app"
+
+  zap trash: [
+    "~/Library/Application Support/NullByte",
+    "~/Library/Preferences/com.nullbyte.app.plist",
+    "~/Library/Saved Application State/com.nullbyte.app.savedState",
+  ]
+end
+EOF
 
 git add "$CASK_FILE"
-git commit -m "bump nullbyte to v$VERSION"
+git commit -m "bump nullbyte to v$VERSION (arch-aware)"
 git push origin main
 cd - > /dev/null
 

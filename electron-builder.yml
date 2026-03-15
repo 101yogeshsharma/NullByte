@@ -3,11 +3,23 @@ productName: NullByte
 directories:
   output: dist
   app: .
+files:
+  - "main.js"
+  - "preload.js"
+  - "renderer/overlay.html"
+  - "renderer/setup.html"
+  - "renderer/settings.html"
+  - "assets/icon.png"
+  - "assets/icons/win/icon.ico"
+  - "assets/icons/mac/icon.icns"
+  - "build/installer.nsh"
+  - "package.json"
+  - "node_modules/**/*"
 win:
   target: nsis
   icon: assets/icons/win/icon.ico
   requestedExecutionLevel: asInvoker
-  artifactName: NullByte.v${version}.${ext}
+  artifactName: NullByte-Setup-${version}.${ext}
 nsis:
   oneClick: false
   perMachine: false
@@ -21,6 +33,6 @@ nsis:
 mac:
   target: dmg
   icon: assets/icons/mac/icon.icns
-  artifactName: NullByte.v${version}.mac.${ext}
+  artifactName: NullByte-${version}-${arch}.${ext}
 dmg:
   sign: false

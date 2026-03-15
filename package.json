@@ -21,10 +21,10 @@
     "scripts": {
         "start": "electron .",
         "dev": "electron .",
-        "build": "electron-builder",
-        "build:win": "electron-builder --win",
-        "build:mac": "electron-builder --mac",
-        "build:linux": "electron-builder --linux"
+        "build": "electron-builder --config electron-builder.yml",
+        "build:win": "electron-builder --win --config electron-builder.yml",
+        "build:mac": "electron-builder --mac --config electron-builder.yml",
+        "build:linux": "electron-builder --linux --config electron-builder.yml"
     },
     "author": "Yogesh Sharma",
     "license": "Apache-2.0",
@@ -43,19 +43,5 @@
         "electron": "^31.0.0",
         "electron-builder": "^26.7.0"
     },
-    "build": {
-        "files": [
-            "main.js",
-            "preload.js",
-            "renderer/overlay.html",
-            "renderer/setup.html",
-            "renderer/settings.html",
-            "assets/icon.png",
-            "assets/icons/win/icon.ico",
-            "assets/icons/mac/icon.icns",
-            "build/installer.nsh",
-            "package.json",
-            "node_modules/**/*"
-        ]
-    }
+}
 }
