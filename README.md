@@ -28,6 +28,23 @@ brew tap 101yogeshsharma/nullbyte
 brew install nullbyte
 ```
 
+> [!CAUTION]
+> ### ⚠️ macOS Security Note
+> Because NullByte is currently an unsigned developer tool, macOS will block it from opening the first time with a "Apple could not verify..." warning.
+>
+> ![macOS Security Warning](assets/docs/mac_security.png)
+>
+> **To fix this, you have two options:**
+>
+> 1. **Terminal (Deep Clean):** Open your terminal and run the following command to remove the quarantine tag:
+>    ```bash
+>    xattr -d com.apple.quarantine /Applications/NullByte.app
+>    ```
+> 2. **System Settings:** 
+>    - Go to **System Settings** > **Privacy & Security**.
+>    - Scroll down to the **Security** section.
+>    - Click **Open Anyway** next to the NullByte block notice.
+
 *Note: You may be prompted to allow the application to open since it is an unsigned release currently.*
 
 ### 2. Install via Winget (Windows)
