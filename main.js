@@ -120,9 +120,9 @@ function createOverlayWindow() {
 
   // Initial state: Horizontal Strip
   mainWindow = new BrowserWindow({
-    width: 850, // Initial width, flexible
+    width: 1100, // Initial width, flexible
     height: 130, // Start as a strip
-    x: Math.round((width - 600) / 2),
+    x: Math.round((width - 1100) / 2),
     y: 50,
     frame: false,
     transparent: true,
@@ -267,7 +267,7 @@ async function captureScreenshot(solveImmediately = false) {
 }
 
 // --- Gemini Logic ---
-async function solveWithGemini() {
+async function solveWithGemini(customPrompt = null) {
   if (!apiKey) {
     if (mainWindow) {
         mainWindow.show();
@@ -302,13 +302,16 @@ async function solveWithGemini() {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: geminiModel });
 
-    const prompt = `Analyze the attached image(s). Provide the direct, correct answer or solution to the question, problem, or task shown.
-    - If it is a coding problem, output ONLY the fully functional code.
+    const defaultPrompt = `Analyze the attached image(s). Provide the direct, correct answer or solution to the question, problem, or task shown.
+    - If it is a coding problem, output ONLY the fully functional code that is optimized for both time and space complexities.
+    - If it is a code debugging scenario where code is already present on the screen but not working, explicitly highlight the exact line(s) containing the error and explain why it is not working before providing the correct, optimized fixed code for both space and time complexity.
     - If it is a multiple-choice question, provide a list of ONLY the correct option(s), with each correct option on a new line. Do not output all options in a single row.
     - If multiple questions are visible on screen, provide the clearly formatted answer/solution for each question numbered sequentially.
     - If it is a language/communication question, output ONLY the required response or correction.
     - If it is an aptitude/IQ test, output ONLY the logical answer or next item in sequence.
-    - Do NOT include any explanations, reasoning, or conversational filler.`;
+    - Do NOT include any explanations, reasoning, or conversational filler (unless you are explicitly explaining why existing code is not working).`;
+
+    const prompt = (customPrompt && customPrompt.trim() !== '') ? customPrompt.trim() : defaultPrompt;
 
     const imageParts = screenshots.map(path => {
       const fileData = fs.readFileSync(path);
@@ -459,6 +462,22 @@ if (!gotTheLock) {
         });
     });
 
+    // Custom Prompt (P)
+    ['CommandOrControl+Shift+P', 'Alt+Shift+P'].forEach(key => {
+        registerShortcut(key, () => {
+            console.log(`Shortcut Triggered: Custom Prompt (${key})`);
+            if (!mainWindow) createOverlayWindow();
+            
+            if (mainWindow) {
+                mainWindow.setFocusable(true);
+                mainWindow.show();
+                mainWindow.focus();
+                mainWindow.setIgnoreMouseEvents(false);
+                mainWindow.webContents.send('toggle-custom-prompt');
+            }
+        });
+    });
+
     // First run?
     if (!apiKey) {
       createSetupWindow();
@@ -500,8 +519,15 @@ ipcMain.handle('get-current-model', () => {
     return geminiModel;
 });
 
-ipcMain.on('trigger-solve', () => {
-  solveWithGemini();
+ipcMain.on('trigger-solve', (event, customPrompt) => {
+  solveWithGemini(customPrompt);
+});
+
+ipcMain.on('close-custom-prompt', () => {
+  if (mainWindow) {
+    mainWindow.setFocusable(false);
+    mainWindow.blur();
+  }
 });
 
 ipcMain.on('set-ignore-mouse', (event, ignore) => {

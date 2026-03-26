@@ -11,10 +11,12 @@ contextBridge.exposeInMainWorld('api', {
   onGeminiResponse: (callback) => ipcRenderer.on('gemini-response', (event, text) => callback(text)),
   onGeminiStatus: (callback) => ipcRenderer.on('gemini-status', (event, status) => callback(status)),
 
-  triggerSolve: () => ipcRenderer.send('trigger-solve'),
+  triggerSolve: (customPrompt) => ipcRenderer.send('trigger-solve', customPrompt),
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
+  closeCustomPrompt: () => ipcRenderer.send('close-custom-prompt'),
   resizeWindow: (size) => ipcRenderer.send('resize-window', size),
   onToggleModelDropdown: (callback) => ipcRenderer.on('toggle-model-dropdown', () => callback()),
+  onToggleCustomPrompt: (callback) => ipcRenderer.on('toggle-custom-prompt', () => callback()),
   onForceExpand: (callback) => ipcRenderer.on('force-expand', () => callback()),
   onForceCollapse: (callback) => ipcRenderer.on('force-collapse', () => callback()),
   onScrollEvent: (callback) => ipcRenderer.on('scroll-event', (event, direction) => callback(direction)),
