@@ -10,14 +10,14 @@ files:
   - "renderer/setup.html"
   - "renderer/settings.html"
   - "assets/icon.png"
-  - "assets/icons/win/icon.ico"
-  - "assets/icons/mac/icon.icns"
+  - "build/icon.ico"
+  - "build/icon.icns"
   - "build/installer.nsh"
   - "package.json"
   - "node_modules/**/*"
 win:
   target: nsis
-  icon: assets/icons/win/icon.ico
+  icon: build/icon.ico
   requestedExecutionLevel: asInvoker
   artifactName: NullByte-Setup-${version}.${ext}
 nsis:
@@ -28,11 +28,11 @@ nsis:
   include: build/installer.nsh
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  installerIcon: assets/icons/win/icon.ico
-  uninstallerIcon: assets/icons/win/icon.ico
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
 mac:
   target: dmg
-  icon: assets/icons/mac/icon.icns
+  icon: build/icon.icns
   artifactName: NullByte-${version}-${arch}.${ext}
 dmg:
   sign: false
