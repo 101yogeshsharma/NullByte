@@ -1,0 +1,24 @@
+MAC INSTALLATION INSTRUCTIONS
+=============================
+
+Welcome to NullByte! 
+
+Because this application is open-source and not distributed through the official Mac App Store or signed with a paid Apple Developer certificate, macOS Gatekeeper may flag it as "damaged", "malware", or say it "cannot be verified".
+
+Do not panic! The app is completely safe. To bypass macOS Gatekeeper:
+
+OPTION 1: The Terminal Method (Recommended & Easiest)
+1. Drag the NullByte app into your Applications folder as usual.
+2. Open the "Terminal" app on your Mac.
+3. Paste the following exact command and hit Enter:
+   sudo xattr -cr /Applications/NullByte.app
+4. It will ask for your Mac login password. Type it (you won't see the characters as you type) and hit Enter.
+5. You can now launch NullByte normally!
+
+OPTION 2: The Right-Click Method
+1. Drag the NullByte app into your Applications folder.
+2. Open your Applications folder in Finder.
+3. Right-click (or Control-click) on the NullByte app.
+4. Select "Open" from the context menu. 
+5. A warning dialog will appear. Click "Open" anyway. 
+   (If this doesn't work the first time, open your Mac's System Settings > Privacy & Security, scroll down, and click "Open Anyway" next to the NullByte block notice).

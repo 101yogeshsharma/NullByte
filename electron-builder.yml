@@ -36,3 +36,14 @@ mac:
   artifactName: NullByte-${version}-${arch}.${ext}
 dmg:
   sign: false
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+    - x: 270
+      y: 120
+      type: file
+      path: build/INSTALL_INSTRUCTIONS.txt
