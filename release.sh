@@ -77,6 +77,17 @@ cask "nullbyte" do
 
   app "NullByte.app"
 
+  caveats do
+    unsigned_accessibility
+    <<~EOS
+      macOS Gatekeeper may flag this application as damaged or unverified because it is not code-signed.
+      To bypass this and run the application, open your terminal and run:
+        sudo xattr -cr /Applications/NullByte.app
+      
+      Alternatively, right-click (Control-click) the application in your Applications folder and select "Open".
+    EOS
+  end
+
   zap trash: [
     "~/Library/Application Support/NullByte",
     "~/Library/Preferences/com.nullbyte.app.plist",
