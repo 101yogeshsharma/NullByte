@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   getCurrentModel: () => ipcRenderer.invoke('get-current-model'),
   setModel: (id) => ipcRenderer.invoke('set-model', id),
+  fetchModels: () => ipcRenderer.invoke('fetch-models'),
 
   onUpdateScreenshots: (callback) => ipcRenderer.on('update-screenshots', (event, paths) => callback(paths)),
   onGeminiResponse: (callback) => ipcRenderer.on('gemini-response', (event, text) => callback(text)),

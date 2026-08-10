@@ -630,12 +630,7 @@
         const modelList = document.getElementById('model-list');
         const currentModelLabel = document.getElementById('current-model-name');
 
-        // Fixed model list (order matters)
-        const ALLOWED_MODELS = [
-            { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B' },
-            { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash' },
-            { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' }
-        ];
+        let ALLOWED_MODELS = [];
 
         const MODEL_LIMITS = {
             'gemma-3-27b-it': { rpm: '30 RPM', tpm: '15K TPM' },
@@ -703,24 +698,66 @@
             adjustHeight();
         }
 
+        function getLatestFlashModel(models) {
+            const flashModels = models.filter(m => m.id.includes('gemini-') && m.id.includes('-flash'));
+            if (flashModels.length === 0) return null;
+
+            flashModels.sort((a, b) => {
+                const getVer = id => {
+                    const match = id.match(/gemini-(\d+(\.\d+)?)-flash/);
+                    return match ? parseFloat(match[1]) : 0;
+                };
+                return getVer(b.id) - getVer(a.id);
+            });
+
+            return flashModels[0];
+        }
+
         // --- Model Logic ---
         async function loadModels() {
             try {
-                const current = await window.api.getCurrentModel();
-                if (current) currentModelLabel.textContent = current.split('/')[1] || current;
+                ALLOWED_MODELS = await window.api.fetchModels();
+                let current = await window.api.getCurrentModel();
 
-                // Always use fixed model list
+                // Auto-select latest -flash if current is invalid
+                if (!current || !ALLOWED_MODELS.find(m => m.id === current)) {
+                    const fallback = getLatestFlashModel(ALLOWED_MODELS) || ALLOWED_MODELS[0];
+                    if (fallback) {
+                        current = fallback.id;
+                        await window.api.setModel(current);
+                    }
+                }
+
+                if (current) {
+                    const activeModelObj = ALLOWED_MODELS.find(m => m.id === current);
+                    currentModelLabel.textContent = activeModelObj ? activeModelObj.displayName : (current.split('/')[1] || current);
+                }
+
+                const updateSelection = () => {
+                    document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
+                    const activeOpt = [...document.querySelectorAll('.model-option')].find(opt => opt.querySelector('.opt-name').textContent === currentModelLabel.textContent);
+                    if (activeOpt) activeOpt.classList.add('active');
+                };
+
                 modelList.innerHTML = '';
                 ALLOWED_MODELS.forEach(m => {
                     const div = document.createElement('div');
                     div.className = 'model-option ' + (m.id === current ? 'active' : '');
-                    const limits = MODEL_LIMITS[m.id] || { rpm: '-', tpm: '-' };
+                    
+                    const limits = MODEL_LIMITS[m.id];
+                    let limitHtml = '';
+                    if (limits) {
+                        limitHtml = `
+                            <div class="opt-meta">
+                                <span class="opt-badge">${limits.rpm}</span>
+                                <span class="opt-badge">${limits.tpm}</span>
+                            </div>
+                        `;
+                    }
+
                     div.innerHTML = `
                     <div class="opt-name">${m.displayName}</div>
-                    <div class="opt-meta">
-                        <span class="opt-badge">${limits.rpm}</span>
-                        <span class="opt-badge">${limits.tpm}</span>
-                    </div>
+                    ${limitHtml}
                 `;
                     div.onclick = async () => {
                         await window.api.setModel(m.id);

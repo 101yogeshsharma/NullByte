@@ -49,9 +49,7 @@
 
     <label>Gemini Model</label>
     <select id="model">
-        <option value="gemma-3-27b-it">Gemma 3 27B</option>
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        <option value="">Loading models...</option>
     </select>
 
     <label>Update API Key</label>
@@ -64,11 +62,26 @@
         const apiKeyInput = document.getElementById('apiKey');
 
         // Load settings
-        window.api.getSettings().then(function (settings) {
-            if (settings.model) {
-                modelSelect.value = settings.model;
+        async function initSettings() {
+            try {
+                const models = await window.api.fetchModels();
+                modelSelect.innerHTML = '';
+                models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.displayName;
+                    modelSelect.appendChild(opt);
+                });
+
+                const settings = await window.api.getSettings();
+                if (settings.model) {
+                    modelSelect.value = settings.model;
+                }
+            } catch (error) {
+                console.error('Failed to load settings or models:', error);
             }
-        });
+        }
+        initSettings();
 
         document.getElementById('save').addEventListener('click', async function () {
             const updates = {

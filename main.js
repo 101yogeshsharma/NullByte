@@ -519,6 +519,39 @@ ipcMain.handle('get-current-model', () => {
     return geminiModel;
 });
 
+ipcMain.handle('fetch-models', async () => {
+  const fallbackModels = [
+    { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B' },
+    { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' }
+  ];
+
+  if (!apiKey) {
+    return fallbackModels;
+  }
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch models: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    const filtered = data.models
+      .filter(m => m.name.startsWith('models/gemini') || m.name.startsWith('models/gemma'))
+      .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+      .map(m => ({
+        id: m.name.replace('models/', ''),
+        displayName: m.displayName || m.name.replace('models/', '')
+      }));
+
+    return filtered.length > 0 ? filtered : fallbackModels;
+  } catch (error) {
+    console.error('Error fetching models dynamically:', error);
+    return fallbackModels;
+  }
+});
+
 ipcMain.on('trigger-solve', (event, customPrompt) => {
   solveWithGemini(customPrompt);
 });
