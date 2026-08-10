@@ -12,6 +12,6 @@ jobs:
       - name: Submit to Winget Releaser
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
-          identifier: 101yogeshsharma.NullByte
+          identifier: YogeshSharma.NullByte
           installers-regex: '\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
