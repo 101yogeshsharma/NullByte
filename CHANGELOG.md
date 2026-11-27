@@ -26,6 +26,9 @@ All notable changes to **NullByte** are documented in this file.
   - Trims whitespace on saved API keys.
 - **Friendly Free-Tier & Quota Error Messages**:
   - Surfaces clear guidance prompting users to switch to a **Free** model (such as **Gemini 4 Hydrogen**, **Flash**, or **Gemma 4**) when a paid-only model or `429 limit: 0` quota restriction is hit, and removes runtime `404`/retired models from the active dropdown.
+- **macOS Screenshot Capture & Shortcut Reliability (`Cmd+Shift+S` / `Alt+Shift+S`)**:
+  - Added a `/usr/sbin/screencapture` fallback on macOS when Electron `desktopCapturer` fails (`Failed to get sources.`), capture debouncing for rapid key repeats, and Retina scale-factor sizing.
+  - Added `NSScreenCaptureUsageDescription` in `electron-builder.yml`, visible overlay error messages with one-time macOS Screen Recording Settings guidance, a macOS Tray **Screen Recording Permissions** action, and shortcut registration logging.
 - **Unified macOS & Windows App Icons**:
   - Regenerated `build/icon.ico` and `assets/icons/win/icon.ico` from the macOS source PNGs with valid 32-bit BGRA + 1-bpp AND-mask entries (`16–128px`) and PNG-encoded `256x256`.
   - Synced `assets/icon.png` to full 32-bit RGBA (`512x512`) and configured Windows `Tray`/`BrowserWindow` and NSIS installer icons cleanly.

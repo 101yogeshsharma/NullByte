@@ -1,6 +1,9 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage, systemPreferences, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 const {
   PROVIDERS,
   pickDefaultFreeModel,
@@ -287,56 +290,149 @@ function clearScreenshots() {
   if (mainWindow) mainWindow.webContents.send('update-screenshots', []);
 }
 
+let isCapturing = false;
+let lastCaptureAt = 0;
+let promptedScreenPermission = false;
+
+function openMacScreenRecordingSettings() {
+  if (process.platform === 'darwin') {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+  }
+}
+
+async function captureWithMacScreencapture(filePath) {
+  const wasVisible = !!(mainWindow && mainWindow.isVisible());
+  if (wasVisible) mainWindow.hide();
+  try {
+    await execFileAsync('/usr/sbin/screencapture', ['-x', '-m', '-t', 'png', filePath]);
+  } finally {
+    if (wasVisible && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.showInactive();
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    }
+  }
+  return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+}
+
 // --- Screenshot Logic ---
 async function captureScreenshot(solveImmediately = false) {
+  const now = Date.now();
+  if (isCapturing || now - lastCaptureAt < 350) {
+    return;
+  }
+  isCapturing = true;
+  lastCaptureAt = now;
+
   try {
+    if (!mainWindow) createOverlayWindow();
+
     const primaryDisplay = screen.getPrimaryDisplay();
-    
-    // --- STEALTH: Hide overlay before capturing so it's never in the screenshot ---
-    // --- STEALTH: setContentProtection(true) handles hiding from capture automatically on Windows.
-    // No need to manually hide/show, which causes blinking.
-    
-    // desktopCapturer is safer than user-mode hooks
-    const sources = await desktopCapturer.getSources({ 
-      types: ['screen'], 
-      thumbnailSize: { width: primaryDisplay.size.width, height: primaryDisplay.size.height } 
-    });
+    const scale = primaryDisplay.scaleFactor || 1;
+    const filename = `capture_${Date.now()}.png`;
+    const filePath = path.join(TEMP_DIR, filename);
 
-    const primarySource = sources.find(s => s.display_id === primaryDisplay.id.toString()) || sources[0];
-    
-    if (primarySource) {
-      const image = primarySource.thumbnail;
-      const filename = `capture_${Date.now()}.png`;
-      const filePath = path.join(TEMP_DIR, filename);
-      
-      fs.writeFileSync(filePath, image.toPNG());
-      screenshots.push(filePath);
-      log(`Screenshot captured: ${filePath}`);
+    let captured = false;
+    let captureError = null;
 
-      // --- Restore overlay after capture ---
-      if (mainWindow) {
-        // Force window to be 'active' for a split second to ensure painting
-        mainWindow.setIgnoreMouseEvents(false);
-        setTimeout(() => {
-             if (mainWindow) mainWindow.setIgnoreMouseEvents(true, { forward: true });
-        }, 200);
-        
-        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    // 1. Primary path: Electron desktopCapturer (respects setContentProtection without blinking)
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: {
+          width: Math.round(primaryDisplay.size.width * scale),
+          height: Math.round(primaryDisplay.size.height * scale)
+        }
+      });
+
+      const primarySource = sources.find(s => s.display_id === primaryDisplay.id.toString()) || sources[0];
+      if (primarySource && primarySource.thumbnail && !primarySource.thumbnail.isEmpty()) {
+        fs.writeFileSync(filePath, primarySource.thumbnail.toPNG());
+        captured = true;
+      } else {
+        captureError = new Error('No screen source returned by desktopCapturer.');
       }
+    } catch (err) {
+      captureError = err;
+      log(`desktopCapturer failed: ${err.message || err}`);
+    }
 
-      // If NOT solving immediately, ensure we start in strip mode (collapse)
-      if (!solveImmediately) {
-          mainWindow.webContents.send('force-collapse');
-      }
-      
-      mainWindow.webContents.send('update-screenshots', screenshots);
-
-      if (solveImmediately) {
-        setTimeout(() => solveWithGemini(), 500);
+    // 2. macOS fallback: native screencapture (handles Electron/ScreenCaptureKit failures on newer macOS)
+    if (!captured && process.platform === 'darwin') {
+      try {
+        captured = await captureWithMacScreencapture(filePath);
+        if (captured) {
+          log('Captured screenshot via macOS screencapture fallback.');
+        }
+      } catch (macErr) {
+        captureError = macErr;
+        log(`macOS screencapture fallback failed: ${macErr.message || macErr}`);
       }
     }
+
+    if (!captured) {
+      const screenStatus = process.platform === 'darwin'
+        ? systemPreferences.getMediaAccessStatus('screen')
+        : 'unknown';
+      const detail = captureError ? (captureError.message || String(captureError)) : 'Unknown error';
+      log(`Screenshot failed (screen=${screenStatus}): ${detail}`);
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.webContents.send('force-expand');
+        mainWindow.webContents.send('gemini-status', 'error');
+
+        if (process.platform === 'darwin') {
+          if (screenStatus !== 'granted' && !promptedScreenPermission) {
+            promptedScreenPermission = true;
+            openMacScreenRecordingSettings();
+          }
+          mainWindow.webContents.send(
+            'gemini-response',
+            `**Screen Recording Permission Required on macOS**\n\n` +
+            `NullByte could not capture your screen (\`status: ${screenStatus}\`, \`${detail}\`).\n\n` +
+            `1. Open **System Settings > Privacy & Security > Screen & System Audio Recording**\n` +
+            `2. Enable **NullByte** (or **Terminal** / your IDE if running via \`npm start\`)\n` +
+            `3. **Quit and reopen NullByte** for the permission to take effect.`
+          );
+        } else {
+          mainWindow.webContents.send(
+            'gemini-response',
+            `**Screenshot Failed**: ${detail}`
+          );
+        }
+      }
+      return;
+    }
+
+    screenshots.push(filePath);
+    log(`Screenshot captured: ${filePath}`);
+
+    // --- Restore overlay after capture ---
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setIgnoreMouseEvents(false);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setIgnoreMouseEvents(true, { forward: true });
+        }
+      }, 200);
+
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
+      if (!solveImmediately) {
+        mainWindow.webContents.send('force-collapse');
+      }
+
+      mainWindow.webContents.send('update-screenshots', screenshots);
+    }
+
+    if (solveImmediately) {
+      setTimeout(() => solveWithGemini(), 500);
+    }
   } catch (error) {
-    log(`Screenshot failed: ${error}`);
+    log(`Screenshot failed: ${error.message || error}`);
+  } finally {
+    isCapturing = false;
   }
 }
 
@@ -476,6 +572,9 @@ if (!gotTheLock) {
       { label: 'Show/Hide Overlay', click: toggleOverlay },
       { label: 'Capture Screenshot', click: () => captureScreenshot(false) },
       { label: 'Settings', click: createSettingsWindow },
+      ...(process.platform === 'darwin'
+        ? [{ label: 'Screen Recording Permissions', click: openMacScreenRecordingSettings }]
+        : []),
       { label: 'Clear Cache', click: clearScreenshots },
       { type: 'separator' },
       { label: 'Exit', click: () => app.quit() }
@@ -488,15 +587,16 @@ if (!gotTheLock) {
     const registerShortcut = (accelerator, callback) => {
         try {
             const ret = globalShortcut.register(accelerator, callback);
-            if (!ret) console.log(`Registration failed for ${accelerator}`);
-            else console.log(`Registered ${accelerator}`);
+            if (!ret) log(`Registration failed for ${accelerator}`);
+            else log(`Registered ${accelerator}`);
         } catch (e) {
-            console.error(`Exception registering ${accelerator}:`, e);
+            log(`Exception registering ${accelerator}: ${e.message}`);
         }
     };
 
     // Standard
     registerShortcut('CommandOrControl+Shift+S', () => captureScreenshot(false));
+    registerShortcut('Alt+Shift+S', () => captureScreenshot(false));
     registerShortcut('CommandOrControl+Shift+Q', toggleOverlay);
     registerShortcut('CommandOrControl+Shift+X', clearScreenshots);
     registerShortcut('CommandOrControl+Shift+Esc', () => app.quit());

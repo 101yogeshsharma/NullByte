@@ -38,6 +38,8 @@ mac:
   target: dmg
   icon: build/icon.icns
   artifactName: NullByte-${version}-${arch}.${ext}
+  extendInfo:
+    NSScreenCaptureUsageDescription: "NullByte needs Screen Recording permission to capture your screen for AI code analysis."
 dmg:
   sign: false
   contents:
