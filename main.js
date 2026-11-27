@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage, systemPreferences, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage, systemPreferences, shell, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -7,7 +7,8 @@ const execFileAsync = promisify(execFile);
 const {
   PROVIDERS,
   pickDefaultFreeModel,
-  formatProviderError
+  formatProviderError,
+  isAbortError
 } = require('./modelCatalog');
 const {
   DEFAULT_OLLAMA_URL,
@@ -32,6 +33,29 @@ const TEMP_DIR = path.join(app.getPath('temp'), 'NullByte');
 const ICON_PNG_PATH = path.join(__dirname, 'assets', 'icon.png');
 const ICON_ICO_PATH = path.join(__dirname, 'assets', 'icons', 'win', 'icon.ico');
 const appIconPath = process.platform === 'win32' && fs.existsSync(ICON_ICO_PATH) ? ICON_ICO_PATH : ICON_PNG_PATH;
+
+function createTrayIcon() {
+  if (process.platform === 'darwin') {
+    const baseIcon = nativeImage.createFromPath(ICON_PNG_PATH);
+    if (!baseIcon.isEmpty()) {
+      const trayImage = nativeImage.createEmpty();
+      trayImage.addRepresentation({
+        scaleFactor: 1.0,
+        width: 18,
+        height: 18,
+        buffer: baseIcon.resize({ width: 18, height: 18, quality: 'best' }).toPNG()
+      });
+      trayImage.addRepresentation({
+        scaleFactor: 2.0,
+        width: 36,
+        height: 36,
+        buffer: baseIcon.resize({ width: 36, height: 36, quality: 'best' }).toPNG()
+      });
+      return trayImage;
+    }
+  }
+  return appIconPath;
+}
 
 let mainWindow = null; // The overlay
 let setupWindow = null;
@@ -282,17 +306,52 @@ function toggleOverlay() {
   }
 }
 
-function clearScreenshots() {
-  screenshots.forEach(p => {
-    try { fs.unlinkSync(p); } catch(e) {}
-  });
-  screenshots = [];
-  if (mainWindow) mainWindow.webContents.send('update-screenshots', []);
-}
-
 let isCapturing = false;
 let lastCaptureAt = 0;
 let promptedScreenPermission = false;
+let activeSolveController = null;
+let activeSolveId = 0;
+let pendingAutoSolveTimer = null;
+let captureSessionGeneration = 0;
+
+function cancelActiveSolve({ notifyRenderer = true } = {}) {
+  let cancelled = false;
+
+  if (pendingAutoSolveTimer) {
+    clearTimeout(pendingAutoSolveTimer);
+    pendingAutoSolveTimer = null;
+    cancelled = true;
+  }
+
+  if (activeSolveController) {
+    activeSolveController.abort();
+    activeSolveController = null;
+    cancelled = true;
+  }
+
+  activeSolveId += 1;
+
+  if (cancelled) {
+    log('Stopped active AI request.');
+    if (notifyRenderer && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('gemini-status', 'cancelled');
+    }
+  }
+
+  return cancelled;
+}
+
+function clearScreenshots() {
+  captureSessionGeneration += 1;
+  cancelActiveSolve({ notifyRenderer: true });
+  screenshots.forEach(p => {
+    try { fs.unlinkSync(p); } catch (e) {}
+  });
+  screenshots = [];
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-screenshots', []);
+  }
+}
 
 function openMacScreenRecordingSettings() {
   if (process.platform === 'darwin') {
@@ -320,6 +379,7 @@ async function captureScreenshot(solveImmediately = false) {
   if (isCapturing || now - lastCaptureAt < 350) {
     return;
   }
+  const captureGeneration = captureSessionGeneration;
   isCapturing = true;
   lastCaptureAt = now;
 
@@ -405,6 +465,12 @@ async function captureScreenshot(solveImmediately = false) {
       return;
     }
 
+    if (captureGeneration !== captureSessionGeneration) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+      log('Discarded captured screenshot because cache was cleared mid-capture.');
+      return;
+    }
+
     screenshots.push(filePath);
     log(`Screenshot captured: ${filePath}`);
 
@@ -427,7 +493,13 @@ async function captureScreenshot(solveImmediately = false) {
     }
 
     if (solveImmediately) {
-      setTimeout(() => solveWithGemini(), 500);
+      if (pendingAutoSolveTimer) clearTimeout(pendingAutoSolveTimer);
+      pendingAutoSolveTimer = setTimeout(() => {
+        pendingAutoSolveTimer = null;
+        if (captureGeneration === captureSessionGeneration) {
+          solveWithGemini();
+        }
+      }, 500);
     }
   } catch (error) {
     log(`Screenshot failed: ${error.message || error}`);
@@ -439,7 +511,7 @@ async function captureScreenshot(solveImmediately = false) {
 // --- AI Provider Logic ---
 async function solveWithGemini(customPrompt = null) {
   if (!hasActiveCredentials()) {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
         const providerLabel = activeProvider === PROVIDERS.OPENROUTER ? 'OpenRouter API Key' : 'Gemini API Key';
         mainWindow.show();
         mainWindow.webContents.send('gemini-response', `**Error**: Missing ${providerLabel}.\nPlease add it in Settings (via Tray icon) or switch providers.`);
@@ -450,7 +522,7 @@ async function solveWithGemini(customPrompt = null) {
   }
 
   if (!geminiModel) {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.show();
         mainWindow.webContents.send('gemini-response', `**Error**: No active model selected.\nOpen **Settings** or press **Cmd/Ctrl+Shift+M** to pick a model.`);
         mainWindow.webContents.send('gemini-status', 'error');
@@ -460,8 +532,10 @@ async function solveWithGemini(customPrompt = null) {
   }
   
   // WAIT FOR WINDOW LOAD if newly created
+  const startClearGen = captureSessionGeneration;
   if (mainWindow && mainWindow.webContents.isLoading()) {
       await new Promise(resolve => mainWindow.webContents.once('did-finish-load', resolve));
+      if (startClearGen !== captureSessionGeneration) return;
   }
   
   if (screenshots.length === 0) {
@@ -471,8 +545,14 @@ async function solveWithGemini(customPrompt = null) {
       return; 
   }
 
+  cancelActiveSolve({ notifyRenderer: false });
+  const solveId = ++activeSolveId;
+  const controller = new AbortController();
+  activeSolveController = controller;
+  const { signal } = controller;
+
   // Ensure window is visible and expanded
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
       if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.setAlwaysOnTop(true, 'screen-saver');
       mainWindow.webContents.send('force-expand'); 
@@ -504,7 +584,24 @@ async function solveWithGemini(customPrompt = null) {
       model: geminiModel,
       prompt,
       imageBase64List,
+      signal,
+      maxRetries: 2,
+      retryDelayMs: 1500,
+      onRetry: ({ attempt, nextAttempt, totalAttempts, delayMs, error }) => {
+        if (signal.aborted || solveId !== activeSolveId) return;
+        log(
+          `Model under heavy load (${activeProvider} / ${geminiModel}) on attempt ${attempt}/${totalAttempts}: ${error.message}. Retrying (${nextAttempt}/${totalAttempts}) in ${delayMs}ms...`
+        );
+        fullText = '';
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(
+            'gemini-response',
+            `*Model is currently under heavy load — retrying automatically (attempt ${nextAttempt}/${totalAttempts})...*`
+          );
+        }
+      },
       onModelStatus: (modelStatus) => {
+        if (signal.aborted || solveId !== activeSolveId) return;
         const stage = modelStatus.modelStage;
         if (!deprecationHandled && (stage === 'LEGACY' || stage === 'DEPRECATED' || stage === 'RETIRED')) {
           deprecationHandled = true;
@@ -513,29 +610,50 @@ async function solveWithGemini(customPrompt = null) {
         }
       },
       onChunk: (chunkText) => {
+        if (signal.aborted || solveId !== activeSolveId) return;
         if (chunkText) {
           fullText += chunkText;
-          if (mainWindow) mainWindow.webContents.send('gemini-response', fullText);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('gemini-response', fullText);
+          }
         }
       }
     });
-    
-    if (mainWindow) mainWindow.webContents.send('gemini-status', 'done');
+
+    if (signal.aborted || solveId !== activeSolveId) return;
+
+    if (activeSolveController === controller) {
+      activeSolveController = null;
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('gemini-status', 'done');
+    }
 
     // Auto-clear screenshots after successful solution
     clearScreenshots();
     log('Screenshots auto-cleared after successful solution.');
 
   } catch (error) {
+    if (signal.aborted || solveId !== activeSolveId || isAbortError(error)) {
+      return;
+    }
+    if (activeSolveController === controller) {
+      activeSolveController = null;
+    }
     log(`Provider Error (${activeProvider} / ${geminiModel}): ${error.message}`);
     const formatted = formatProviderError(activeProvider, error, geminiModel, cachedModels);
     if (formatted.shouldMarkDeprecated) {
       rejectedModels.add(geminiModel);
       await refreshModelsAndNotify();
     }
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('gemini-response', formatted.userMessage);
       mainWindow.webContents.send('gemini-status', 'error');
+    }
+  } finally {
+    if (activeSolveController === controller) {
+      activeSolveController = null;
     }
   }
 }
@@ -567,7 +685,7 @@ if (!gotTheLock) {
     }
 
     // Tray
-    tray = new Tray(appIconPath); // Ensure this exists or use empty native image
+    tray = new Tray(createTrayIcon());
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show/Hide Overlay', click: toggleOverlay },
       { label: 'Capture Screenshot', click: () => captureScreenshot(false) },
@@ -842,5 +960,6 @@ ipcMain.on('resize-window', (event, { width, height }) => {
 
 // Clean up
 app.on('will-quit', () => {
+  cancelActiveSolve({ notifyRenderer: false });
   globalShortcut.unregisterAll();
 });

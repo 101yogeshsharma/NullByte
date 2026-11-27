@@ -2,6 +2,22 @@
 
 All notable changes to **NullByte** are documented in this file.
 
+## [0.7.1] - 2026-11-27
+
+### Added
+- **Automatic Heavy-Load Retries (`providerClient.js`, `modelCatalog.js`, `main.js`)**:
+  - Automatically retries transient overload / high-demand errors (`500`/`502`/`503`/`504`/`529`, `UNAVAILABLE`, `"heavy load"`, `"high demand"`, `"overloaded"`) up to **2 additional times** (`3` attempts total) with backoff across Google Gemini, OpenRouter, and Ollama while displaying live retry progress in the overlay.
+  - Added `isOverloadError` classification and user-friendly fallback error messages when retries are exhausted.
+- **Stop In-Flight Fetching via `Cmd/Ctrl + Shift + X` (`main.js`, `providerClient.js`, `renderer/overlay.html`)**:
+  - Cancels active Gemini/OpenRouter/Ollama HTTP requests, SSE/NDJSON stream readers, async iterators, retry backoff sleeps, and pending auto-solve timers immediately when pressing `Cmd/Ctrl + Shift + X` (or clicking Tray **Clear Cache**), stopping the spinner and preventing stale chunks or captures from updating the overlay.
+- **Retry & Cancellation Unit Tests (`test/providerRetryAndCancel.test.js`)**:
+  - Added automated unit tests covering overload classification, error formatting, 2x automatic retries, non-retryable errors, and immediate `AbortController` stream and backoff cancellation.
+
+### Fixed
+- **macOS App Bundle & Menu Bar Tray Icons (`build/icon.icns`, `assets/icons/mac/icon.icns`, `main.js`)**:
+  - Rebuilt `build/icon.icns` and `assets/icons/mac/icon.icns` with `iconutil` so the `.icns` file-length header matches the actual file size (`552015` bytes instead of a corrupt `8`-byte header that caused macOS Finder/IconServices to display a blank dark squircle).
+  - Updated `main.js` with `createTrayIcon()` using Electron `nativeImage` (`18x18` `@1x` and `36x36` `@2x` representations) so the macOS menu bar tray icon renders cleanly.
+
 ## [0.7.0-beta] - 2026-11-27
 
 ### Added

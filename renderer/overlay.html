@@ -893,17 +893,33 @@
         window.api.onForceCollapse(() => toggleExpand(false));
         window.api.onForceExpand(() => toggleExpand(true));
 
+        let isThinking = false;
+        let isCancelled = false;
+
         window.api.onGeminiStatus((status) => {
             if (status === 'thinking') {
+                isCancelled = false;
+                isThinking = true;
                 spinner.style.display = 'inline-block';
                 toggleExpand(true);
                 solutionContent.innerHTML = '<p style="color: #8B5CF6;">Analyzing...</p>';
+            } else if (status === 'cancelled') {
+                const wasThinking = isThinking;
+                isThinking = false;
+                isCancelled = true;
+                spinner.style.display = 'none';
+                if (wasThinking) {
+                    solutionContent.innerHTML = '<p style="color: #8878a9; font-style: italic;">Fetching stopped.</p>';
+                    adjustHeight();
+                }
             } else {
+                isThinking = false;
                 spinner.style.display = 'none';
             }
         });
 
         window.api.onGeminiResponse((text) => {
+            if (isCancelled) return;
             solutionContent.innerHTML = marked.parse(text);
             Prism.highlightAll();
             adjustHeight();

@@ -273,26 +273,90 @@ function getFallbackModels(rejectedIds = new Set()) {
 }
 
 /**
+ * Returns true if an error represents user/request cancellation.
+ */
+function isAbortError(error) {
+  if (!error) return false;
+  return error.name === 'AbortError' || error.code === 'ABORT_ERR';
+}
+
+/**
+ * Extracts normalized HTTP status and nested JSON API error details (handling SDK SSE prefixes).
+ */
+function extractErrorDetails(error) {
+  const rawMessage = (error && error.message) ? String(error.message) : 'Unknown error occurred.';
+  let status = error && typeof error.status === 'number' ? error.status : null;
+  let apiErrorMessage = rawMessage;
+  let apiErrorStatus = '';
+
+  const jsonStart = rawMessage.indexOf('{');
+  if (jsonStart !== -1) {
+    try {
+      const parsed = JSON.parse(rawMessage.slice(jsonStart));
+      if (parsed && parsed.error) {
+        apiErrorMessage = parsed.error.message || rawMessage;
+        apiErrorStatus = parsed.error.status || '';
+        if (status === null && typeof parsed.error.code === 'number') {
+          status = parsed.error.code;
+        }
+      }
+    } catch (_) {
+      // rawMessage is plain text
+    }
+  }
+
+  return {
+    status,
+    rawMessage,
+    apiErrorMessage,
+    apiErrorStatus,
+    lower: `${apiErrorStatus} ${apiErrorMessage} ${rawMessage}`.toLowerCase()
+  };
+}
+
+/**
+ * Returns true if the error indicates transient heavy load / high demand / server overload that should retry.
+ */
+function isOverloadError(error) {
+  if (!error || isAbortError(error)) return false;
+  const { status, lower, apiErrorStatus } = extractErrorDetails(error);
+
+  if (
+    status === 400 ||
+    status === 401 ||
+    status === 402 ||
+    status === 403 ||
+    status === 404 ||
+    status === 422 ||
+    lower.includes('limit: 0') ||
+    lower.includes('api_key_invalid') ||
+    lower.includes('api key not valid') ||
+    lower.includes('insufficient credits') ||
+    lower.includes('econnrefused')
+  ) {
+    return false;
+  }
+
+  if (status === 500 || status === 502 || status === 503 || status === 504 || status === 529) {
+    return true;
+  }
+
+  const normalizedApiStatus = String(apiErrorStatus || '').toUpperCase();
+  if (normalizedApiStatus === 'UNAVAILABLE' || normalizedApiStatus === 'INTERNAL') {
+    return true;
+  }
+
+  return (
+    /(?:heavy load|high demand|overloaded|model is busy|server is busy|temporarily unavailable|service unavailable|at capacity|currently unavailable)/i.test(lower) ||
+    (/\bunavailable\b/i.test(lower) && !lower.includes('quota'))
+  );
+}
+
+/**
  * Extracts a readable message and status code from @google/genai errors and returns a user-friendly response.
  */
 function formatGeminiError(error, modelId, models = []) {
-  const status = error && typeof error.status === 'number' ? error.status : null;
-  let rawMessage = (error && error.message) ? String(error.message) : 'Unknown error occurred.';
-
-  // @google/genai ApiError.message may contain serialized JSON from the API response
-  let apiErrorMessage = rawMessage;
-  let apiErrorStatus = '';
-  try {
-    const parsed = JSON.parse(rawMessage);
-    if (parsed && parsed.error) {
-      apiErrorMessage = parsed.error.message || rawMessage;
-      apiErrorStatus = parsed.error.status || '';
-    }
-  } catch (_) {
-    // rawMessage is plain text
-  }
-
-  const lower = `${apiErrorStatus} ${apiErrorMessage}`.toLowerCase();
+  const { status, apiErrorMessage, lower } = extractErrorDetails(error);
   const modelMeta = models.find(m => m.id === modelId);
   const displayName = (modelMeta && modelMeta.displayName) || modelId;
   const isPaidModel = modelMeta ? modelMeta.tier === 'paid' : getModelTier(modelId) === 'paid';
@@ -331,7 +395,18 @@ function formatGeminiError(error, modelId, models = []) {
     };
   }
 
-  // 3. Free tier restriction, quota exhaustion, or paid-only model blocked
+  // 3. Transient server overload / heavy load (after automatic retries)
+  if (isOverloadError(error)) {
+    return {
+      shouldMarkDeprecated: false,
+      userMessage:
+        `**Model Temporarily Under Heavy Load**\n\n` +
+        `**${displayName}** is currently experiencing high demand (automatic retries failed).\n\n` +
+        `Please try again in a few moments or switch to another **Free** model such as **Gemma 4** or **Flash**.`
+    };
+  }
+
+  // 4. Free tier restriction, quota exhaustion, or paid-only model blocked
   const isQuotaOrTierBlock =
     status === 429 ||
     lower.includes('resource_exhausted') ||
@@ -492,6 +567,15 @@ function formatProviderError(provider, error, modelId, models = []) {
           `**${displayName}** is currently unavailable. Please select another **Free** vision model from the dropdown.`
       };
     }
+    if (isOverloadError(error)) {
+      return {
+        shouldMarkDeprecated: false,
+        userMessage:
+          `**Model Temporarily Under Heavy Load**\n\n` +
+          `**${displayName}** is currently experiencing high demand (automatic retries failed).\n\n` +
+          `Please try again in a few moments or switch to another **Free** (:free) vision model.`
+      };
+    }
     return {
       shouldMarkDeprecated: false,
       userMessage: `**OpenRouter Error**: ${rawMessage}`
@@ -535,6 +619,8 @@ module.exports = {
   curateOllamaModels,
   pickDefaultFreeModel,
   getFallbackModels,
+  isAbortError,
+  isOverloadError,
   formatGeminiError,
   formatProviderError
 };

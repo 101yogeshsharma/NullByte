@@ -6,10 +6,115 @@ const {
   curateOpenRouterModels,
   curateOllamaModels,
   getFallbackModels,
-  formatProviderError
+  formatProviderError,
+  isAbortError,
+  isOverloadError
 } = require('./modelCatalog');
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
+const DEFAULT_HEAVY_LOAD_RETRIES = 2;
+const DEFAULT_RETRY_DELAY_MS = 1500;
+
+function createAbortError(message = 'Request cancelled by user.') {
+  const err = new Error(message);
+  err.name = 'AbortError';
+  err.code = 'ABORT_ERR';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal && signal.aborted) {
+    throw createAbortError();
+  }
+}
+
+function sleepWithSignal(ms, signal) {
+  if (signal && signal.aborted) {
+    return Promise.reject(createAbortError());
+  }
+  if (!ms || ms <= 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(createAbortError());
+    };
+    const timer = setTimeout(() => {
+      if (signal) signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
+
+function raceWithAbort(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) {
+    promise.catch(() => {});
+    return Promise.reject(createAbortError());
+  }
+
+  let onAbort;
+  const abortPromise = new Promise((_, reject) => {
+    onAbort = () => reject(createAbortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+
+  // Prevent unhandled rejection if the underlying stream rejects after abort
+  promise.catch(() => {});
+
+  return Promise.race([promise, abortPromise]).finally(() => {
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  });
+}
+
+async function readBodyLines(body, signal, onLine) {
+  if (!body || typeof body.getReader !== 'function') {
+    return;
+  }
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const onAbort = () => {
+    reader.cancel().catch(() => {});
+  };
+  if (signal) {
+    if (signal.aborted) {
+      onAbort();
+      throw createAbortError();
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  try {
+    while (true) {
+      throwIfAborted(signal);
+      const { value, done } = await raceWithAbort(reader.read(), signal);
+      throwIfAborted(signal);
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const shouldStop = onLine(line);
+        if (shouldStop === true) return;
+      }
+    }
+
+    if (buffer.trim()) {
+      onLine(buffer);
+    }
+  } finally {
+    if (signal) signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
+  }
+}
 
 function normalizeOllamaUrl(url) {
   const cleaned = (url || DEFAULT_OLLAMA_URL).trim().replace(/\/+$/, '');
@@ -179,10 +284,7 @@ async function testProviderConnection({ provider, apiKey, openrouterApiKey, olla
   }
 }
 
-/**
- * Streams responses for screenshots + prompt from Gemini, OpenRouter, or Ollama.
- */
-async function streamProviderResponse({
+async function streamSingleAttempt({
   provider,
   apiKey,
   openrouterApiKey,
@@ -190,10 +292,15 @@ async function streamProviderResponse({
   model,
   prompt,
   imageBase64List,
+  signal,
   onChunk,
-  onModelStatus
+  onModelStatus,
+  client,
+  fetchImpl
 }) {
+  throwIfAborted(signal);
   const activeProvider = provider || PROVIDERS.GEMINI;
+  const fetchFn = fetchImpl || fetch;
 
   if (activeProvider === PROVIDERS.OPENROUTER) {
     const key = (openrouterApiKey || '').trim();
@@ -211,20 +318,24 @@ async function streamProviderResponse({
       });
     });
 
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/101yogeshsharma/NullByte',
-        'X-Title': 'NullByte'
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [{ role: 'user', content }]
-      })
-    });
+    const res = await raceWithAbort(
+      fetchFn('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        signal,
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/101yogeshsharma/NullByte',
+          'X-Title': 'NullByte'
+        },
+        body: JSON.stringify({
+          model,
+          stream: true,
+          messages: [{ role: 'user', content }]
+        })
+      }),
+      signal
+    );
 
     if (!res.ok) {
       const bodyText = await res.text();
@@ -233,51 +344,54 @@ async function streamProviderResponse({
       throw err;
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    await readBodyLines(res.body, signal, (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return false;
+      const payload = trimmed.slice(5).trim();
+      if (payload === '[DONE]') return true;
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === '[DONE]') return;
-        try {
-          const json = JSON.parse(payload);
-          const delta = json.choices && json.choices[0] && json.choices[0].delta && json.choices[0].delta.content;
-          if (delta) onChunk(delta);
-        } catch (_) {
-          // Ignore partial/comment SSE lines
-        }
+      let json;
+      try {
+        json = JSON.parse(payload);
+      } catch (_) {
+        // Ignore partial/comment SSE lines
+        return false;
       }
-    }
+
+      if (json && json.error) {
+        const err = new Error(json.error.message || JSON.stringify(json.error));
+        if (typeof json.error.code === 'number') err.status = json.error.code;
+        throw err;
+      }
+
+      const delta = json.choices && json.choices[0] && json.choices[0].delta && json.choices[0].delta.content;
+      if (delta && onChunk) onChunk(delta);
+      return false;
+    });
     return;
   }
 
   if (activeProvider === PROVIDERS.OLLAMA) {
     const base = normalizeOllamaUrl(ollamaUrl);
-    const res = await fetch(`${base}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-            images: imageBase64List
-          }
-        ]
-      })
-    });
+    const res = await raceWithAbort(
+      fetchFn(`${base}/api/chat`, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          stream: true,
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+              images: imageBase64List
+            }
+          ]
+        })
+      }),
+      signal
+    );
 
     if (!res.ok) {
       const bodyText = await res.text();
@@ -286,50 +400,139 @@ async function streamProviderResponse({
       throw err;
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    await readBodyLines(res.body, signal, (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const json = JSON.parse(trimmed);
-          const text = json.message && json.message.content;
-          if (text) onChunk(text);
-        } catch (_) {
-          // Ignore malformed chunk
-        }
+      let json;
+      try {
+        json = JSON.parse(trimmed);
+      } catch (_) {
+        // Ignore malformed chunk
+        return false;
       }
-    }
+
+      if (json && json.error) {
+        const err = new Error(typeof json.error === 'string' ? json.error : JSON.stringify(json.error));
+        if (typeof json.status === 'number') err.status = json.status;
+        throw err;
+      }
+
+      const text = json.message && json.message.content;
+      if (text && onChunk) onChunk(text);
+      return false;
+    });
     return;
   }
 
   // Default: Google Gemini
   const cleanKey = (apiKey || '').trim();
-  const ai = new GoogleGenAI({ apiKey: cleanKey });
+  const ai = client || new GoogleGenAI({ apiKey: cleanKey });
   const imageParts = imageBase64List.map(data => ({
     inlineData: { data, mimeType: 'image/png' }
   }));
 
-  const responseStream = await ai.models.generateContentStream({
+  const requestParams = {
     model,
     contents: [{ text: prompt }, ...imageParts]
-  });
+  };
+  if (signal) {
+    requestParams.config = { abortSignal: signal };
+  }
 
-  for await (const chunk of responseStream) {
-    if (chunk.modelStatus && chunk.modelStatus.modelStage && onModelStatus) {
-      onModelStatus(chunk.modelStatus);
+  const responseStream = await raceWithAbort(
+    ai.models.generateContentStream(requestParams),
+    signal
+  );
+
+  const iterator = responseStream[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      throwIfAborted(signal);
+      const { value: chunk, done } = await raceWithAbort(iterator.next(), signal);
+      throwIfAborted(signal);
+      if (done) break;
+
+      if (chunk && chunk.modelStatus && chunk.modelStatus.modelStage && onModelStatus) {
+        onModelStatus(chunk.modelStatus);
+      }
+      if (chunk && chunk.text && onChunk) {
+        onChunk(chunk.text);
+      }
     }
-    if (chunk.text) {
-      onChunk(chunk.text);
+  } finally {
+    if (iterator && typeof iterator.return === 'function') {
+      const cleanup = Promise.resolve(iterator.return()).catch(() => {});
+      if (!(signal && signal.aborted)) {
+        await cleanup;
+      }
+    }
+  }
+}
+
+/**
+ * Streams responses for screenshots + prompt from Gemini, OpenRouter, or Ollama,
+ * with automatic retries on transient heavy-load errors and AbortSignal cancellation.
+ */
+async function streamProviderResponse({
+  provider,
+  apiKey,
+  openrouterApiKey,
+  ollamaUrl,
+  model,
+  prompt,
+  imageBase64List,
+  signal,
+  maxRetries = DEFAULT_HEAVY_LOAD_RETRIES,
+  retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+  onChunk,
+  onModelStatus,
+  onRetry,
+  client,
+  fetchImpl
+}) {
+  const retries = Number.isFinite(maxRetries) ? Math.max(0, maxRetries) : DEFAULT_HEAVY_LOAD_RETRIES;
+  const baseDelay = Number.isFinite(retryDelayMs) ? Math.max(0, retryDelayMs) : DEFAULT_RETRY_DELAY_MS;
+  const totalAttempts = retries + 1;
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    throwIfAborted(signal);
+    try {
+      await streamSingleAttempt({
+        provider,
+        apiKey,
+        openrouterApiKey,
+        ollamaUrl,
+        model,
+        prompt,
+        imageBase64List,
+        signal,
+        onChunk,
+        onModelStatus,
+        client,
+        fetchImpl
+      });
+      return;
+    } catch (error) {
+      if ((signal && signal.aborted) || isAbortError(error)) {
+        throw createAbortError();
+      }
+
+      if (attempt > retries || !isOverloadError(error)) {
+        throw error;
+      }
+
+      const delayMs = baseDelay > 0 ? baseDelay * attempt : 0;
+      if (onRetry) {
+        onRetry({
+          attempt,
+          nextAttempt: attempt + 1,
+          totalAttempts,
+          delayMs,
+          error
+        });
+      }
+      await sleepWithSignal(delayMs, signal);
     }
   }
 }

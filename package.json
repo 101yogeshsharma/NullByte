@@ -1,7 +1,7 @@
 {
     "name": "nullbyte",
     "productName": "NullByte",
-    "version": "0.7.0-beta",
+    "version": "0.7.1",
     "description": "NullByte - AI Coding Assistant powered by Gemini",
     "keywords": [
         "electron",
