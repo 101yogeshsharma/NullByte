@@ -1,10 +1,10 @@
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
+const { curateModels } = require('./modelCatalog');
 
 // Read API key from command line argument or from saved config
-let apiKey = process.argv[2]; // Pass as: node verify_key.js YOUR_API_KEY
+let apiKey = (process.argv[2] || '').trim(); // Pass as: node verify_key.js YOUR_API_KEY
 
 if (!apiKey) {
   // Try to read from saved config
@@ -13,7 +13,7 @@ if (!apiKey) {
     const configPath = path.join(userDataPath, 'nullbyte', 'config', 'settings.json');
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      apiKey = config.apiKey;
+      apiKey = (config.apiKey || '').trim();
       if (!apiKey) {
         console.error('❌ No API key found in config. Key is stored encrypted and cannot be read from this script.');
         console.error('   Usage: node verify_key.js YOUR_API_KEY');
@@ -31,11 +31,18 @@ if (!apiKey) {
   }
 }
 
-const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+const options = {
+  hostname: 'generativelanguage.googleapis.com',
+  path: '/v1beta/models?pageSize=100',
+  method: 'GET',
+  headers: {
+    'x-goog-api-key': apiKey
+  }
+};
 
 console.log(`Checking API Key: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`);
 
-https.get(url, (res) => {
+https.get(options, (res) => {
   let data = '';
 
   console.log(`Status Code: ${res.statusCode}`);
@@ -49,11 +56,10 @@ https.get(url, (res) => {
       try {
         const json = JSON.parse(data);
         if (json.models) {
-          console.log('\n✅ Success! Available Models:');
-          json.models.forEach(m => {
-             if(m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')) {
-                 console.log(` - ${m.name.replace('models/', '')} (${m.displayName})`);
-             }
+          const curated = curateModels(json.models);
+          console.log('\n✅ Success! Active Curated Models:');
+          curated.forEach(m => {
+            console.log(` - ${m.id} (${m.displayName}) [${m.tier.toUpperCase()}]${m.isDefault ? ' (Default)' : ''}`);
           });
         } else {
           console.log('⚠️  Response JSON valid but no "models" array found.');
@@ -63,11 +69,10 @@ https.get(url, (res) => {
         console.error('❌ Error parsing JSON:', e.message);
       }
     } else {
-        console.error(`❌ Request failed with status ${res.statusCode}`);
-        console.error('Body:', data);
+      console.error(`❌ Request failed with status ${res.statusCode}`);
+      console.error('Body:', data);
     }
   });
-
 }).on('error', (err) => {
   console.error('❌ Network Error:', err.message);
 });

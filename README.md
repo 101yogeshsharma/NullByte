@@ -80,20 +80,20 @@ cd NullByte
 npm install
 ```
 
-### 3. Get a Gemini API Key
+### 3. Configure an AI Provider (Gemini, OpenRouter, or Ollama)
 
-NullByte uses Google's Gemini AI under the hood. You'll need a free API key:
+NullByte works out of the box with **Google Gemini** (defaulting to **Gemini 4 Hydrogen**, available on Google AI Studio's Free Tier) and also supports **OpenRouter** free vision models and **Ollama** local models:
 
-1. Go to [Google AI Studio](https://aistudio.google.com/).
-2. Sign in with your Google account.
-3. Click **"Get API Key"** → **"Create API Key"**.
-4. Copy the key — you'll paste it into NullByte when you first launch it.
+1. **Google Gemini (Default):** Go to [Google AI Studio](https://aistudio.google.com/), sign in, click **"Create API Key"**, and copy the full key (`AQ...` or `AIza...`) using the **Copy key** button.
+2. **OpenRouter (Optional Free Alternative):** Create a key at [openrouter.ai/keys](https://openrouter.ai/keys) and select **OpenRouter** in NullByte **Settings** to use free vision models without Google Cloud billing.
+3. **Ollama (Local / Offline):** Run [Ollama](https://ollama.com/) locally with a vision model (e.g., `ollama pull qwen2.5vl` or `ollama pull gemma3`) and choose **Ollama** in **Settings**.
 
-> **Note:** Your API key may have restrictions. If the default `gemini3 27B` model fails, try selecting another model from the app's dropdown menu.
+> **Note:** Models in NullByte are fetched dynamically on startup and tagged as **FREE**, **PAID**, or **LOCAL** (deprecated/retired models are automatically hidden). You can click **Test Key / Connection** in **Settings** anytime to verify credentials and quota.
 
-### 4. Run in Development Mode
+### 4. Run in Development Mode & Tests
 
 ```bash
+npm test
 npm run start
 ```
 
@@ -128,15 +128,18 @@ The output installers will be placed in the `dist/` folder.
 
 ```
 NullByte/
-├── main.js                 # Electron main process — window creation, hotkeys, AI logic
+├── main.js                 # Electron main process — window creation, hotkeys, AI orchestration
+├── modelCatalog.js         # Model curation, deprecation filtering, Free/Paid tagging & errors
+├── providerClient.js       # Gemini, OpenRouter, and Ollama API clients
 ├── preload.js              # Preload script — bridges main ↔ renderer securely
 ├── renderer/               # Frontend UI files
-│   └── overlay.html        # The overlay's HTML, CSS, and client-side JS
-├── assets/
-│   └── icon.png            # App icon (512×512)
-├── build/
-│   └── installer.nsh       # NSIS installer customization script
-├── verify_key.js           # Gemini API key validation utility
+│   ├── overlay.html        # Floating overlay UI
+│   ├── settings.html       # Provider, model & API key test settings
+│   └── setup.html          # Initial onboarding window
+├── assets/                 # App icons (PNG / macOS ICNS / Windows ICO)
+├── build/                  # Installer config & scripts
+├── test/                   # Automated unit tests (`npm test`)
+├── verify_key.js           # Gemini API key validation CLI utility
 ├── electron-builder.yml    # Electron Builder configuration
 ├── package.json            # Project metadata and scripts
 └── build.sh                # Bash build helper script
@@ -145,7 +148,7 @@ NullByte/
 ## 🎮 Usage
 
 1. **Launch** NullByte.
-2. **Enter your API Key** — Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/) and paste it when prompted.
+2. **Configure a Provider** — Enter a Google Gemini API key (`AQ...` / `AIza...`) from [Google AI Studio](https://aistudio.google.com/), or choose **OpenRouter** / **Ollama** in Settings.
 3. **Use keyboard shortcuts** to interact with NullByte:
 
 | Shortcut | Action |
@@ -176,9 +179,10 @@ NullByte/
 
 | Problem | Solution |
 |---|---|
-| `npm install` fails | Make sure you have Node.js v18+ installed. Run `node -v` to check. |
+| `npm install` fails | Make sure you have Node.js v20+ installed. Run `node -v` to check. |
 | NullByte doesn't appear | Press `Ctrl + Shift + Q` to toggle visibility. Check if the app is running in the system tray. |
-| "Invalid API Key" error | Double-check your Gemini API key at [Google AI Studio](https://aistudio.google.com/). Make sure there are no extra spaces. |
+| "Invalid API Key" error | Use the **Copy key** button in [Google AI Studio](https://aistudio.google.com/) and test it with **Test Key** in Settings. |
+| Paid model / `limit: 0` error | Switch to a **FREE**-tagged model (like **Gemini 4 Hydrogen** or **Gemma 4**), or switch to **OpenRouter** / **Ollama** in Settings. |
 | Build fails with privilege errors | Run your terminal as **Administrator** and try again. |
 | Screenshots are blank | Make sure you're not running the app in a virtual machine, as some VMs restrict screen capture APIs. |
 

@@ -6,10 +6,13 @@ directories:
 files:
   - "main.js"
   - "preload.js"
+  - "modelCatalog.js"
+  - "providerClient.js"
   - "renderer/overlay.html"
   - "renderer/setup.html"
   - "renderer/settings.html"
   - "assets/icon.png"
+  - "assets/icons/win/icon.ico"
   - "build/icon.ico"
   - "build/icon.icns"
   - "build/installer.nsh"
@@ -30,6 +33,7 @@ nsis:
   createStartMenuShortcut: true
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
 mac:
   target: dmg
   icon: build/icon.icns

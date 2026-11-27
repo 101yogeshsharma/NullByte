@@ -1,7 +1,7 @@
 {
     "name": "nullbyte",
     "productName": "NullByte",
-    "version": "0.6.1-beta",
+    "version": "0.7.0-beta",
     "description": "NullByte - AI Coding Assistant powered by Gemini",
     "keywords": [
         "electron",
@@ -21,8 +21,9 @@
     "scripts": {
         "start": "electron .",
         "dev": "electron .",
+        "test": "node --test test/*.test.js",
         "build": "electron-builder --config electron-builder.yml",
-        "build:win": "electron-builder --win --config electron-builder.yml",
+        "build:win": "electron-builder --win --x64 --config electron-builder.yml",
         "build:mac": "electron-builder --mac --config electron-builder.yml",
         "build:linux": "electron-builder --linux --config electron-builder.yml"
     },
@@ -37,7 +38,7 @@
         "url": "https://github.com/101yogeshsharma/NullByte/issues"
     },
     "dependencies": {
-        "@google/generative-ai": "^0.21.0"
+        "@google/genai": "^3.6.1"
     },
     "devDependencies": {
         "electron": "^31.0.0",

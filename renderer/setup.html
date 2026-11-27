@@ -97,10 +97,12 @@
     <div class="container">
         <h1>Welcome to NullByte</h1>
         <p>To get started, please enter your Google Gemini API Key. This will be stored securely on your device.</p>
-        <input type="password" id="apiKey" placeholder="Enter API Key (AIzaSy...)" />
+        <input type="password" id="apiKey" placeholder="Enter API Key (AQ... or AIzaSy...)" />
         <button id="saveBtn">Start Coding</button>
         <div class="link">
             <a href="#" onclick="window.api.openExternal('https://aistudio.google.com/app/apikey')">Get an API Key</a>
+            &nbsp;·&nbsp;
+            <a href="#" onclick="window.api.openSettings()">Use OpenRouter / Local Ollama</a>
         </div>
     </div>
     <script>

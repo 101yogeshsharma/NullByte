@@ -1,7 +1,18 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer, Tray, Menu, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const {
+  PROVIDERS,
+  pickDefaultFreeModel,
+  formatProviderError
+} = require('./modelCatalog');
+const {
+  DEFAULT_OLLAMA_URL,
+  normalizeOllamaUrl,
+  fetchProviderModels,
+  testProviderConnection,
+  streamProviderResponse
+} = require('./providerClient');
 
 // --- Stealth: Disguise process name ---
 app.setName('NullByte');
@@ -15,14 +26,40 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
 const LOG_DIR = path.join(app.getPath('userData'), 'logs');
 const TEMP_DIR = path.join(app.getPath('temp'), 'NullByte');
 
+const ICON_PNG_PATH = path.join(__dirname, 'assets', 'icon.png');
+const ICON_ICO_PATH = path.join(__dirname, 'assets', 'icons', 'win', 'icon.ico');
+const appIconPath = process.platform === 'win32' && fs.existsSync(ICON_ICO_PATH) ? ICON_ICO_PATH : ICON_PNG_PATH;
+
 let mainWindow = null; // The overlay
 let setupWindow = null;
 let settingsWindow = null;
 let tray = null;
-let trayIconPath = path.join(__dirname, 'assets', 'icon.png');
 let screenshots = []; // Store screenshot paths
-let geminiModel = 'gemma-3-27b-it'; // User requested "Gemini 3 27B" (Gemma 3 27B)
+let activeProvider = PROVIDERS.GEMINI;
+let geminiModel = 'gemini-4-hydrogen';
 let apiKey = null;
+let openrouterApiKey = null;
+let ollamaUrl = DEFAULT_OLLAMA_URL;
+let providerModels = { gemini: 'gemini-4-hydrogen', openrouter: '', ollama: '' };
+let cachedModels = [];
+const rejectedModels = new Set();
+
+function decryptStoredKey(hexValue, plainValue, label) {
+  if (hexValue && safeStorage.isEncryptionAvailable()) {
+    try {
+      return safeStorage.decryptString(Buffer.from(hexValue, 'hex')).trim();
+    } catch (e) {
+      log(`Failed to decrypt ${label}: ${e.message}`);
+    }
+  }
+  return plainValue ? String(plainValue).trim() : null;
+}
+
+function hasActiveCredentials() {
+  if (activeProvider === PROVIDERS.OPENROUTER) return !!(openrouterApiKey && openrouterApiKey.trim());
+  if (activeProvider === PROVIDERS.OLLAMA) return true;
+  return !!(apiKey && apiKey.trim());
+}
 
 // Ensure directories exist
 function ensureDirs() {
@@ -44,19 +81,26 @@ function loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-      if (data.encryptedKey) {
-        if (safeStorage.isEncryptionAvailable()) {
-          try {
-            apiKey = safeStorage.decryptString(Buffer.from(data.encryptedKey, 'hex'));
-          } catch (e) {
-            log("Failed to decrypt key: " + e.message);
-          }
-        }
-      } else if (data.apiKey) {
-        // Plain text fallback (e.g. from setup script)
-        apiKey = data.apiKey;
+      const loadedGeminiKey = decryptStoredKey(data.encryptedKey, data.apiKey, 'Gemini key');
+      if (loadedGeminiKey) apiKey = loadedGeminiKey;
+
+      const loadedOrKey = decryptStoredKey(data.encryptedOpenRouterKey, data.openrouterApiKey, 'OpenRouter key');
+      if (loadedOrKey) openrouterApiKey = loadedOrKey;
+
+      if (data.provider && Object.values(PROVIDERS).includes(data.provider)) {
+        activeProvider = data.provider;
       }
-      if (data.model) geminiModel = data.model;
+      if (data.ollamaUrl) {
+        ollamaUrl = normalizeOllamaUrl(data.ollamaUrl);
+      }
+      if (data.providerModels && typeof data.providerModels === 'object') {
+        providerModels = { ...providerModels, ...data.providerModels };
+      }
+      if (data.model) {
+        geminiModel = data.model;
+      } else if (providerModels[activeProvider]) {
+        geminiModel = providerModels[activeProvider];
+      }
       return data;
     }
   } catch (err) {
@@ -67,23 +111,53 @@ function loadConfig() {
 
 function saveConfig(newConfig) {
   const current = loadConfig();
-  const updated = { ...current, ...newConfig };
-  
-  if (newConfig.apiKey) { // explicitly check newConfig for key update
-     apiKey = newConfig.apiKey; // Update memory immediately
+  const normalized = { ...newConfig };
+  if (typeof normalized.apiKey === 'string') {
+    normalized.apiKey = normalized.apiKey.trim();
+    if (normalized.apiKey) apiKey = normalized.apiKey;
+  }
+  if (typeof normalized.openrouterApiKey === 'string') {
+    normalized.openrouterApiKey = normalized.openrouterApiKey.trim();
+    if (normalized.openrouterApiKey) openrouterApiKey = normalized.openrouterApiKey;
+  }
+  if (typeof normalized.ollamaUrl === 'string' && normalized.ollamaUrl.trim()) {
+    normalized.ollamaUrl = normalizeOllamaUrl(normalized.ollamaUrl);
+    ollamaUrl = normalized.ollamaUrl;
+  }
+  if (normalized.provider && Object.values(PROVIDERS).includes(normalized.provider)) {
+    activeProvider = normalized.provider;
   }
 
-  // If we have an API key in memory (or passed in), ensure it's encrypted in the file object
-  const keyToSave = newConfig.apiKey || apiKey;
-  if (keyToSave) {
-      if (safeStorage.isEncryptionAvailable()) {
-        updated.encryptedKey = safeStorage.encryptString(keyToSave).toString('hex');
-        delete updated.apiKey; // Remove plain text from file object
-      } else {
-        updated.apiKey = keyToSave; // Fallback
-      }
+  const updated = { ...current, ...normalized };
+  updated.provider = activeProvider;
+  updated.ollamaUrl = ollamaUrl;
+
+  if (normalized.model) {
+    geminiModel = normalized.model;
+    providerModels[activeProvider] = normalized.model;
   }
-  
+  updated.providerModels = { ...providerModels };
+
+  const geminiToSave = normalized.apiKey || apiKey;
+  if (geminiToSave) {
+    if (safeStorage.isEncryptionAvailable()) {
+      updated.encryptedKey = safeStorage.encryptString(geminiToSave).toString('hex');
+      delete updated.apiKey;
+    } else {
+      updated.apiKey = geminiToSave;
+    }
+  }
+
+  const orToSave = normalized.openrouterApiKey || openrouterApiKey;
+  if (orToSave) {
+    if (safeStorage.isEncryptionAvailable()) {
+      updated.encryptedOpenRouterKey = safeStorage.encryptString(orToSave).toString('hex');
+      delete updated.openrouterApiKey;
+    } else {
+      updated.openrouterApiKey = orToSave;
+    }
+  }
+
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(updated, null, 2));
 }
 
@@ -98,7 +172,7 @@ function createSetupWindow() {
     width: 600,
     height: 450,
     title: 'NullByte Setup',
-    icon: trayIconPath,
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -176,7 +250,7 @@ function createSettingsWindow() {
     width: 500,
     height: 600,
     title: 'NullByte Settings',
-    icon: trayIconPath,
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -266,14 +340,25 @@ async function captureScreenshot(solveImmediately = false) {
   }
 }
 
-// --- Gemini Logic ---
+// --- AI Provider Logic ---
 async function solveWithGemini(customPrompt = null) {
-  if (!apiKey) {
+  if (!hasActiveCredentials()) {
     if (mainWindow) {
+        const providerLabel = activeProvider === PROVIDERS.OPENROUTER ? 'OpenRouter API Key' : 'Gemini API Key';
         mainWindow.show();
-        mainWindow.webContents.send('gemini-response', "**Error**: Missing API Key.\nPlease add your Gemini API Key in Settings.");
+        mainWindow.webContents.send('gemini-response', `**Error**: Missing ${providerLabel}.\nPlease add it in Settings (via Tray icon) or switch providers.`);
         mainWindow.webContents.send('gemini-status', 'error');
         mainWindow.webContents.send('force-expand'); 
+    }
+    return;
+  }
+
+  if (!geminiModel) {
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.webContents.send('gemini-response', `**Error**: No active model selected.\nOpen **Settings** or press **Cmd/Ctrl+Shift+M** to pick a model.`);
+        mainWindow.webContents.send('gemini-status', 'error');
+        mainWindow.webContents.send('force-expand');
     }
     return;
   }
@@ -299,9 +384,6 @@ async function solveWithGemini(customPrompt = null) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: geminiModel });
-
     const defaultPrompt = `Analyze the attached image(s). Provide the direct, correct answer or solution to the question, problem, or task shown.
     - If it is a coding problem, output ONLY the fully functional code that is optimized for both time and space complexities.
     - If it is a code debugging scenario where code is already present on the screen but not working, explicitly highlight the exact line(s) containing the error and explain why it is not working before providing the correct, optimized fixed code for both space and time complexity.
@@ -313,24 +395,34 @@ async function solveWithGemini(customPrompt = null) {
 
     const prompt = (customPrompt && customPrompt.trim() !== '') ? customPrompt.trim() : defaultPrompt;
 
-    const imageParts = screenshots.map(path => {
-      const fileData = fs.readFileSync(path);
-      return {
-        inlineData: {
-          data: fileData.toString('base64'),
-          mimeType: "image/png"
-        }
-      };
-    });
-
-    const result = await model.generateContentStream([prompt, ...imageParts]);
+    const imageBase64List = screenshots.map(imgPath => fs.readFileSync(imgPath).toString('base64'));
 
     let fullText = '';
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      fullText += chunkText;
-      if (mainWindow) mainWindow.webContents.send('gemini-response', fullText);
-    }
+    let deprecationHandled = false;
+
+    await streamProviderResponse({
+      provider: activeProvider,
+      apiKey,
+      openrouterApiKey,
+      ollamaUrl,
+      model: geminiModel,
+      prompt,
+      imageBase64List,
+      onModelStatus: (modelStatus) => {
+        const stage = modelStatus.modelStage;
+        if (!deprecationHandled && (stage === 'LEGACY' || stage === 'DEPRECATED' || stage === 'RETIRED')) {
+          deprecationHandled = true;
+          rejectedModels.add(geminiModel);
+          refreshModelsAndNotify().catch(err => log(`Model refresh error: ${err.message}`));
+        }
+      },
+      onChunk: (chunkText) => {
+        if (chunkText) {
+          fullText += chunkText;
+          if (mainWindow) mainWindow.webContents.send('gemini-response', fullText);
+        }
+      }
+    });
     
     if (mainWindow) mainWindow.webContents.send('gemini-status', 'done');
 
@@ -339,9 +431,16 @@ async function solveWithGemini(customPrompt = null) {
     log('Screenshots auto-cleared after successful solution.');
 
   } catch (error) {
-    log(`Gemini Error: ${error.message}`);
-    if (mainWindow) mainWindow.webContents.send('gemini-response', `Error: ${error.message} \n\nCheck your API Key in Settings.`);
-    if (mainWindow) mainWindow.webContents.send('gemini-status', 'error');
+    log(`Provider Error (${activeProvider} / ${geminiModel}): ${error.message}`);
+    const formatted = formatProviderError(activeProvider, error, geminiModel, cachedModels);
+    if (formatted.shouldMarkDeprecated) {
+      rejectedModels.add(geminiModel);
+      await refreshModelsAndNotify();
+    }
+    if (mainWindow) {
+      mainWindow.webContents.send('gemini-response', formatted.userMessage);
+      mainWindow.webContents.send('gemini-status', 'error');
+    }
   }
 }
 
@@ -372,7 +471,7 @@ if (!gotTheLock) {
     }
 
     // Tray
-    tray = new Tray(path.join(__dirname, 'assets', 'icon.png')); // Ensure this exists or use empty native image
+    tray = new Tray(appIconPath); // Ensure this exists or use empty native image
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show/Hide Overlay', click: toggleOverlay },
       { label: 'Capture Screenshot', click: () => captureScreenshot(false) },
@@ -479,7 +578,7 @@ if (!gotTheLock) {
     });
 
     // First run?
-    if (!apiKey) {
+    if (!hasActiveCredentials()) {
       createSetupWindow();
     } else {
       createOverlayWindow();
@@ -487,25 +586,116 @@ if (!gotTheLock) {
   });
 }
 
+async function fetchModelsList(options = null) {
+  if (options && options.provider && options.provider !== activeProvider) {
+    return fetchProviderModels({
+      provider: options.provider,
+      apiKey: options.apiKey || apiKey,
+      openrouterApiKey: options.openrouterApiKey || openrouterApiKey,
+      ollamaUrl: options.ollamaUrl || ollamaUrl,
+      rejectedModels
+    });
+  }
+
+  cachedModels = await fetchProviderModels({
+    provider: activeProvider,
+    apiKey: (options && options.apiKey) || apiKey,
+    openrouterApiKey: (options && options.openrouterApiKey) || openrouterApiKey,
+    ollamaUrl: (options && options.ollamaUrl) || ollamaUrl,
+    rejectedModels
+  });
+
+  // Ensure the active model is valid and not deprecated
+  if (cachedModels.length > 0 && !cachedModels.find(m => m.id === geminiModel)) {
+    const defaultModel = pickDefaultFreeModel(cachedModels);
+    if (defaultModel) {
+      geminiModel = defaultModel.id;
+      saveConfig({ model: geminiModel });
+    }
+  }
+
+  return cachedModels;
+}
+
+async function refreshModelsAndNotify() {
+  const models = await fetchModelsList();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('models-updated', models);
+  }
+  return models;
+}
+
 // IPC Handlers
-ipcMain.handle('save-api-key', (event, key) => {
-  saveConfig({ apiKey: key });
+ipcMain.handle('save-api-key', async (event, key) => {
+  rejectedModels.clear();
+  saveConfig({ provider: PROVIDERS.GEMINI, apiKey: key });
+  await fetchModelsList();
   if (setupWindow) setupWindow.close();
-  createOverlayWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('models-updated', cachedModels);
+  } else {
+    createOverlayWindow();
+  }
   return true;
 });
 
+ipcMain.on('open-settings', () => {
+  if (setupWindow) setupWindow.close();
+  createSettingsWindow();
+});
+
 ipcMain.handle('get-settings', () => {
-    return { model: geminiModel, hasKey: !!apiKey };
+  return {
+    provider: activeProvider,
+    model: geminiModel,
+    providerModels,
+    hasKey: !!apiKey,
+    hasOpenRouterKey: !!openrouterApiKey,
+    ollamaUrl
+  };
 });
 
-ipcMain.handle('save-settings', (event, settings) => {
-    saveConfig(settings);
-    // Reload model
-    if (settings.model) geminiModel = settings.model;
+ipcMain.handle('save-settings', async (event, settings) => {
+  const next = settings || {};
+  if (next.apiKey || next.openrouterApiKey || next.provider) {
+    rejectedModels.clear();
+  }
+  saveConfig(next);
+  if (next.model) {
+    geminiModel = next.model;
+  } else if (providerModels[activeProvider]) {
+    geminiModel = providerModels[activeProvider];
+  }
+
+  const models = await refreshModelsAndNotify();
+  if (setupWindow) setupWindow.close();
+  if (!mainWindow && hasActiveCredentials()) {
+    createOverlayWindow();
+  }
+  return { ok: true, models };
 });
 
+ipcMain.handle('test-connection', async (event, payload = {}) => {
+  const targetProvider = payload.provider || activeProvider;
+  const result = await testProviderConnection({
+    provider: targetProvider,
+    apiKey: payload.apiKey && payload.apiKey.trim() ? payload.apiKey.trim() : apiKey,
+    openrouterApiKey:
+      payload.openrouterApiKey && payload.openrouterApiKey.trim()
+        ? payload.openrouterApiKey.trim()
+        : openrouterApiKey,
+    ollamaUrl: payload.ollamaUrl || ollamaUrl,
+    model: payload.model
+  });
 
+  if (result.models && result.models.length > 0 && targetProvider === activeProvider) {
+    cachedModels = result.models;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('models-updated', cachedModels);
+    }
+  }
+  return result;
+});
 
 // IPC: Set Model
 ipcMain.handle('set-model', (event, modelId) => {
@@ -516,40 +706,11 @@ ipcMain.handle('set-model', (event, modelId) => {
 
 // IPC: Get Current Model
 ipcMain.handle('get-current-model', () => {
-    return geminiModel;
+  return geminiModel;
 });
 
-ipcMain.handle('fetch-models', async () => {
-  const fallbackModels = [
-    { id: 'gemma-3-27b-it', displayName: 'Gemma 3 27B' },
-    { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash' },
-    { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' }
-  ];
-
-  if (!apiKey) {
-    return fallbackModels;
-  }
-
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.status}`);
-    }
-    const data = await response.json();
-    
-    const filtered = data.models
-      .filter(m => m.name.startsWith('models/gemini') || m.name.startsWith('models/gemma'))
-      .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-      .map(m => ({
-        id: m.name.replace('models/', ''),
-        displayName: m.displayName || m.name.replace('models/', '')
-      }));
-
-    return filtered.length > 0 ? filtered : fallbackModels;
-  } catch (error) {
-    console.error('Error fetching models dynamically:', error);
-    return fallbackModels;
-  }
+ipcMain.handle('fetch-models', async (event, options) => {
+  return fetchModelsList(options);
 });
 
 ipcMain.on('trigger-solve', (event, customPrompt) => {

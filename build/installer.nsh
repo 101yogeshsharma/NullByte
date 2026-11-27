@@ -58,7 +58,7 @@ FunctionEnd
      SetShellVarContext current
      CreateDirectory "$APPDATA\NullByte\config"
      FileOpen $0 "$APPDATA\NullByte\config\settings.json" w
-     FileWrite $0 '{"apiKey": "$TheAPIKey", "model": "gemma-3-27b-it"}'
+     FileWrite $0 '{"apiKey": "$TheAPIKey", "model": "gemini-4-hydrogen"}'
      FileClose $0
   ${EndIf}
 !macroend

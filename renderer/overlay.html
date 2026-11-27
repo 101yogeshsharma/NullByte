@@ -150,9 +150,15 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            width: 145px;
+            width: 172px;
             justify-content: space-between;
             transition: all 0.2s;
+        }
+
+        #current-model-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .model-btn:hover {
@@ -163,6 +169,7 @@
         .model-btn .chevron {
             font-size: 10px;
             opacity: 0.6;
+            flex-shrink: 0;
         }
 
         /* Model Dropdown Menu */
@@ -173,7 +180,7 @@
             background: rgba(18, 16, 30, 0.97);
             border: 1px solid rgba(139, 92, 246, 0.35);
             border-radius: 12px;
-            width: 280px;
+            width: 300px;
             max-height: 300px;
             overflow-y: auto;
             z-index: 9999;
@@ -201,7 +208,7 @@
             cursor: pointer;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 4px;
             transition: background 0.15s;
         }
 
@@ -219,6 +226,13 @@
             background: rgba(139, 92, 246, 0.1);
         }
 
+        .opt-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
         .opt-name {
             font-weight: 600;
             font-size: 12px;
@@ -229,7 +243,36 @@
             font-size: 10px;
             color: #8878a9;
             display: flex;
-            gap: 8px;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tier-badge {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .tier-badge.free {
+            background: rgba(16, 185, 129, 0.16);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .tier-badge.paid {
+            background: rgba(245, 158, 11, 0.16);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .tier-badge.local {
+            background: rgba(56, 189, 248, 0.16);
+            color: #7dd3fc;
+            border: 1px solid rgba(56, 189, 248, 0.35);
         }
 
         .opt-badge {
@@ -632,12 +675,6 @@
 
         let ALLOWED_MODELS = [];
 
-        const MODEL_LIMITS = {
-            'gemma-3-27b-it': { rpm: '30 RPM', tpm: '15K TPM' },
-            'gemini-2.5-flash': { rpm: '5 RPM', tpm: '250K TPM' },
-            'gemini-2.0-flash': { rpm: '15 RPM', tpm: '1M TPM' }
-        };
-
         // Auto-Resize Logic
         let isExpanded = false;
         let isDropdownOpen = false;
@@ -698,78 +735,104 @@
             adjustHeight();
         }
 
-        function getLatestFlashModel(models) {
-            const flashModels = models.filter(m => m.id.includes('gemini-') && m.id.includes('-flash'));
-            if (flashModels.length === 0) return null;
+        function getPreferredFreeModel(models) {
+            return (
+                models.find(m => m.isDefault) ||
+                models.find(m => m.tier === 'free') ||
+                models[0] ||
+                null
+            );
+        }
 
-            flashModels.sort((a, b) => {
-                const getVer = id => {
-                    const match = id.match(/gemini-(\d+(\.\d+)?)-flash/);
-                    return match ? parseFloat(match[1]) : 0;
-                };
-                return getVer(b.id) - getVer(a.id);
+        function syncActiveOption(activeId) {
+            document.querySelectorAll('.model-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.modelId === activeId);
             });
+        }
 
-            return flashModels[0];
+        async function renderModels(models) {
+            ALLOWED_MODELS = Array.isArray(models) ? models : [];
+            let current = await window.api.getCurrentModel();
+
+            // Auto-select default Free model (e.g. Gemini 4 Hydrogen) if saved model is missing/deprecated
+            if (!current || !ALLOWED_MODELS.find(m => m.id === current)) {
+                const fallback = getPreferredFreeModel(ALLOWED_MODELS);
+                if (fallback) {
+                    current = fallback.id;
+                    await window.api.setModel(current);
+                }
+            }
+
+            if (ALLOWED_MODELS.length === 0) {
+                currentModelLabel.textContent = 'No models';
+            } else if (current) {
+                const activeModelObj = ALLOWED_MODELS.find(m => m.id === current);
+                currentModelLabel.textContent = activeModelObj ? activeModelObj.displayName : (current.split('/')[1] || current);
+            }
+
+            modelList.innerHTML = '';
+            if (ALLOWED_MODELS.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'model-option';
+                emptyDiv.textContent = 'No models available. Check Settings.';
+                modelList.appendChild(emptyDiv);
+                return;
+            }
+            ALLOWED_MODELS.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'model-option' + (m.id === current ? ' active' : '');
+                div.dataset.modelId = m.id;
+
+                const header = document.createElement('div');
+                header.className = 'opt-header';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'opt-name';
+                nameEl.textContent = m.displayName;
+
+                const tierBadge = document.createElement('span');
+                const tier = (m.tier === 'free' || m.tier === 'local') ? m.tier : 'paid';
+                tierBadge.className = `tier-badge ${tier}`;
+                tierBadge.textContent = tier.toUpperCase();
+
+                header.appendChild(nameEl);
+                header.appendChild(tierBadge);
+                div.appendChild(header);
+
+                const meta = document.createElement('div');
+                meta.className = 'opt-meta';
+
+                const idBadge = document.createElement('span');
+                idBadge.className = 'opt-badge';
+                idBadge.textContent = m.id;
+                meta.appendChild(idBadge);
+
+                if (m.isDefault) {
+                    const defBadge = document.createElement('span');
+                    defBadge.className = 'opt-badge';
+                    defBadge.textContent = 'Default';
+                    meta.appendChild(defBadge);
+                }
+                div.appendChild(meta);
+
+                div.onclick = async () => {
+                    await window.api.setModel(m.id);
+                    currentModelLabel.textContent = m.displayName;
+                    isDropdownOpen = false;
+                    modelList.classList.remove('show');
+                    window.api.setIgnoreMouse(true);
+                    adjustHeight();
+                    syncActiveOption(m.id);
+                };
+                modelList.appendChild(div);
+            });
         }
 
         // --- Model Logic ---
         async function loadModels() {
             try {
-                ALLOWED_MODELS = await window.api.fetchModels();
-                let current = await window.api.getCurrentModel();
-
-                // Auto-select latest -flash if current is invalid
-                if (!current || !ALLOWED_MODELS.find(m => m.id === current)) {
-                    const fallback = getLatestFlashModel(ALLOWED_MODELS) || ALLOWED_MODELS[0];
-                    if (fallback) {
-                        current = fallback.id;
-                        await window.api.setModel(current);
-                    }
-                }
-
-                if (current) {
-                    const activeModelObj = ALLOWED_MODELS.find(m => m.id === current);
-                    currentModelLabel.textContent = activeModelObj ? activeModelObj.displayName : (current.split('/')[1] || current);
-                }
-
-                const updateSelection = () => {
-                    document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
-                    const activeOpt = [...document.querySelectorAll('.model-option')].find(opt => opt.querySelector('.opt-name').textContent === currentModelLabel.textContent);
-                    if (activeOpt) activeOpt.classList.add('active');
-                };
-
-                modelList.innerHTML = '';
-                ALLOWED_MODELS.forEach(m => {
-                    const div = document.createElement('div');
-                    div.className = 'model-option ' + (m.id === current ? 'active' : '');
-                    
-                    const limits = MODEL_LIMITS[m.id];
-                    let limitHtml = '';
-                    if (limits) {
-                        limitHtml = `
-                            <div class="opt-meta">
-                                <span class="opt-badge">${limits.rpm}</span>
-                                <span class="opt-badge">${limits.tpm}</span>
-                            </div>
-                        `;
-                    }
-
-                    div.innerHTML = `
-                    <div class="opt-name">${m.displayName}</div>
-                    ${limitHtml}
-                `;
-                    div.onclick = async () => {
-                        await window.api.setModel(m.id);
-                        currentModelLabel.textContent = m.displayName;
-                        isDropdownOpen = false;
-                        modelList.classList.remove('show');
-                        window.api.setIgnoreMouse(true);
-                        adjustHeight();
-                        updateSelection();
-                    };
-                    modelList.appendChild(div);
-                });
+                const models = await window.api.fetchModels();
+                await renderModels(models);
             } catch (e) {
                 console.error("Model load error", e);
                 currentModelLabel.textContent = "Error";
@@ -788,6 +851,10 @@
                 window.api.setIgnoreMouse(true);
                 adjustHeight();
             }
+        });
+
+        window.api.onModelsUpdated((models) => {
+            renderModels(models);
         });
 
         loadModels();

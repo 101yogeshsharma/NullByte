@@ -5,41 +5,128 @@
     <meta charset="UTF-8">
     <title>Settings</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: system-ui, sans-serif;
-            background: #222;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a24;
             color: #eee;
             padding: 20px;
+            margin: 0;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 18px;
+            font-size: 20px;
+            color: #d4bfff;
         }
 
         label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #c4b5d8;
         }
 
         select,
         input {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 15px;
-            background: #333;
-            border: 1px solid #555;
+            padding: 9px 10px;
+            margin-bottom: 14px;
+            background: #28263a;
+            border: 1px solid #443f66;
             color: white;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: #8B5CF6;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #9389b0;
+            margin-top: -10px;
+            margin-bottom: 14px;
+            line-height: 1.4;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
         }
 
         button {
             background: #646cff;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            padding: 10px 16px;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            flex: 1;
         }
 
         button:hover {
             background: #535bf2;
+        }
+
+        button.secondary {
+            background: #2f2c45;
+            border: 1px solid #4d4770;
+        }
+
+        button.secondary:hover {
+            background: #3d3959;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-banner {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.45;
+            display: none;
+        }
+
+        .status-banner.show {
+            display: block;
+        }
+
+        .status-banner.success {
+            background: rgba(16, 185, 129, 0.14);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+
+        .status-banner.warning {
+            background: rgba(245, 158, 11, 0.14);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fcd34d;
+        }
+
+        .status-banner.error {
+            background: rgba(239, 68, 68, 0.14);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
@@ -47,51 +134,214 @@
 <body>
     <h2>Settings</h2>
 
-    <label>Gemini Model</label>
+    <label for="provider">AI Provider</label>
+    <select id="provider">
+        <option value="gemini">Google Gemini (AI Studio)</option>
+        <option value="openrouter">OpenRouter (Free Vision Models)</option>
+        <option value="ollama">Ollama (Local Models)</option>
+    </select>
+
+    <label for="model">Model</label>
     <select id="model">
         <option value="">Loading models...</option>
     </select>
 
-    <label>Update API Key</label>
-    <input type="password" id="apiKey" placeholder="Leave empty to keep current" />
+    <div id="gemini-fields">
+        <label for="apiKey">Gemini API Key</label>
+        <input type="password" id="apiKey" placeholder="Leave empty to keep current (AQ... / AIza...)" />
+        <div class="hint" id="gemini-hint"></div>
+    </div>
 
-    <button id="save">Save Settings</button>
+    <div id="openrouter-fields" class="hidden">
+        <label for="openrouterApiKey">OpenRouter API Key</label>
+        <input type="password" id="openrouterApiKey" placeholder="Leave empty to keep current (sk-or-v1-...)" />
+        <div class="hint" id="openrouter-hint"></div>
+    </div>
+
+    <div id="ollama-fields" class="hidden">
+        <label for="ollamaUrl">Ollama Base URL</label>
+        <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" />
+        <div class="hint">Make sure Ollama is running locally with a vision model (e.g., qwen2.5vl or gemma3).</div>
+    </div>
+
+    <div class="actions">
+        <button type="button" id="testBtn" class="secondary">Test Key / Connection</button>
+        <button type="button" id="save">Save Settings</button>
+    </div>
+
+    <div id="statusBanner" class="status-banner"></div>
 
     <script>
+        const providerSelect = document.getElementById('provider');
         const modelSelect = document.getElementById('model');
         const apiKeyInput = document.getElementById('apiKey');
+        const openrouterKeyInput = document.getElementById('openrouterApiKey');
+        const ollamaUrlInput = document.getElementById('ollamaUrl');
+        const geminiFields = document.getElementById('gemini-fields');
+        const openrouterFields = document.getElementById('openrouter-fields');
+        const ollamaFields = document.getElementById('ollama-fields');
+        const geminiHint = document.getElementById('gemini-hint');
+        const openrouterHint = document.getElementById('openrouter-hint');
+        const statusBanner = document.getElementById('statusBanner');
+        const testBtn = document.getElementById('testBtn');
+        const saveBtn = document.getElementById('save');
 
-        // Load settings
+        let savedSettings = {};
+
+        function showStatus(type, message) {
+            statusBanner.className = `status-banner show ${type}`;
+            statusBanner.textContent = message;
+        }
+
+        function clearStatus() {
+            statusBanner.className = 'status-banner';
+            statusBanner.textContent = '';
+        }
+
+        function updateProviderFields() {
+            const p = providerSelect.value;
+            geminiFields.classList.toggle('hidden', p !== 'gemini');
+            openrouterFields.classList.toggle('hidden', p !== 'openrouter');
+            ollamaFields.classList.toggle('hidden', p !== 'ollama');
+            testBtn.textContent = p === 'ollama' ? 'Test Ollama' : 'Test Key';
+        }
+
+        function formatTierLabel(tier) {
+            if (tier === 'free') return 'Free';
+            if (tier === 'local') return 'Local';
+            return 'Paid';
+        }
+
+        function populateModelOptions(models, selectedModel) {
+            modelSelect.innerHTML = '';
+            if (!models || models.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = providerSelect.value === 'ollama'
+                    ? 'No local Ollama models found'
+                    : 'No models available';
+                modelSelect.appendChild(opt);
+                return;
+            }
+
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.displayName} [${formatTierLabel(m.tier)}]`;
+                modelSelect.appendChild(opt);
+            });
+
+            if (selectedModel && models.some(m => m.id === selectedModel)) {
+                modelSelect.value = selectedModel;
+            } else {
+                const def = models.find(m => m.isDefault) || models[0];
+                if (def) modelSelect.value = def.id;
+            }
+        }
+
+        async function loadModelsForSelectedProvider(preferredModel) {
+            modelSelect.innerHTML = '<option value="">Loading models...</option>';
+            const p = providerSelect.value;
+            const models = await window.api.fetchModels({
+                provider: p,
+                apiKey: apiKeyInput.value.trim() || undefined,
+                openrouterApiKey: openrouterKeyInput.value.trim() || undefined,
+                ollamaUrl: ollamaUrlInput.value.trim() || undefined
+            });
+            populateModelOptions(models, preferredModel);
+        }
+
         async function initSettings() {
             try {
-                const models = await window.api.fetchModels();
-                modelSelect.innerHTML = '';
-                models.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m.id;
-                    opt.textContent = m.displayName;
-                    modelSelect.appendChild(opt);
-                });
+                savedSettings = await window.api.getSettings();
+                providerSelect.value = savedSettings.provider || 'gemini';
+                ollamaUrlInput.value = savedSettings.ollamaUrl || 'http://localhost:11434';
+                geminiHint.textContent = savedSettings.hasKey
+                    ? 'A Gemini key is saved securely. Leave blank to keep it.'
+                    : 'Paste a Google AI Studio key (starts with AQ... or AIza...).';
+                openrouterHint.textContent = savedSettings.hasOpenRouterKey
+                    ? 'An OpenRouter key is saved securely. Leave blank to keep it.'
+                    : 'Free vision models work without Google billing (openrouter.ai/keys).';
 
-                const settings = await window.api.getSettings();
-                if (settings.model) {
-                    modelSelect.value = settings.model;
-                }
+                updateProviderFields();
+                const preferred =
+                    (savedSettings.providerModels && savedSettings.providerModels[providerSelect.value]) ||
+                    savedSettings.model;
+                await loadModelsForSelectedProvider(preferred);
             } catch (error) {
                 console.error('Failed to load settings or models:', error);
+                showStatus('error', 'Failed to load settings.');
             }
         }
         initSettings();
 
-        document.getElementById('save').addEventListener('click', async function () {
-            const updates = {
-                model: modelSelect.value
-            };
-            if (apiKeyInput.value.trim()) {
-                updates.apiKey = apiKeyInput.value.trim();
+        providerSelect.addEventListener('change', async () => {
+            clearStatus();
+            updateProviderFields();
+            const preferred =
+                savedSettings.providerModels && savedSettings.providerModels[providerSelect.value];
+            await loadModelsForSelectedProvider(preferred);
+        });
+
+        testBtn.addEventListener('click', async () => {
+            clearStatus();
+            testBtn.disabled = true;
+            const origText = testBtn.textContent;
+            testBtn.textContent = 'Testing...';
+
+            try {
+                const result = await window.api.testConnection({
+                    provider: providerSelect.value,
+                    apiKey: apiKeyInput.value.trim() || undefined,
+                    openrouterApiKey: openrouterKeyInput.value.trim() || undefined,
+                    ollamaUrl: ollamaUrlInput.value.trim() || undefined,
+                    model: modelSelect.value || undefined
+                });
+
+                if (result.models && result.models.length > 0) {
+                    populateModelOptions(result.models, modelSelect.value);
+                }
+
+                if (result.ok) {
+                    showStatus('success', result.message);
+                } else if (result.status === 'quota_or_model_error' || result.status === 'no_models') {
+                    showStatus('warning', result.message);
+                } else {
+                    showStatus('error', result.message);
+                }
+            } catch (error) {
+                showStatus('error', `Test failed: ${error.message}`);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = origText;
             }
-            await window.api.saveSettings(updates);
-            alert('Settings Saved! Restart app to apply.');
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            clearStatus();
+            saveBtn.disabled = true;
+            try {
+                const updates = {
+                    provider: providerSelect.value,
+                    model: modelSelect.value,
+                    ollamaUrl: ollamaUrlInput.value.trim() || 'http://localhost:11434'
+                };
+                if (apiKeyInput.value.trim()) {
+                    updates.apiKey = apiKeyInput.value.trim();
+                }
+                if (openrouterKeyInput.value.trim()) {
+                    updates.openrouterApiKey = openrouterKeyInput.value.trim();
+                }
+                await window.api.saveSettings(updates);
+                apiKeyInput.value = '';
+                openrouterKeyInput.value = '';
+                await initSettings();
+                showStatus('success', 'Settings saved and applied immediately!');
+            } catch (error) {
+                showStatus('error', `Failed to save settings: ${error.message}`);
+            } finally {
+                saveBtn.disabled = false;
+            }
         });
     </script>
 </body>

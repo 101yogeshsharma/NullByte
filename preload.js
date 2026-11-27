@@ -4,13 +4,16 @@ contextBridge.exposeInMainWorld('api', {
   saveApiKey: (key) => ipcRenderer.invoke('save-api-key', key),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+  testConnection: (payload) => ipcRenderer.invoke('test-connection', payload),
+  openSettings: () => ipcRenderer.send('open-settings'),
   getCurrentModel: () => ipcRenderer.invoke('get-current-model'),
   setModel: (id) => ipcRenderer.invoke('set-model', id),
-  fetchModels: () => ipcRenderer.invoke('fetch-models'),
+  fetchModels: (options) => ipcRenderer.invoke('fetch-models', options),
 
   onUpdateScreenshots: (callback) => ipcRenderer.on('update-screenshots', (event, paths) => callback(paths)),
   onGeminiResponse: (callback) => ipcRenderer.on('gemini-response', (event, text) => callback(text)),
   onGeminiStatus: (callback) => ipcRenderer.on('gemini-status', (event, status) => callback(status)),
+  onModelsUpdated: (callback) => ipcRenderer.on('models-updated', (event, models) => callback(models)),
 
   triggerSolve: (customPrompt) => ipcRenderer.send('trigger-solve', customPrompt),
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
